@@ -1,0 +1,48 @@
+# Publica o sistema no GitHub Pages a cada alteração enviada para a main.
+# Valores necessários em Settings > Secrets and variables > Actions > Variables:
+#   VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (chave pública; nunca a service_role)
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Conferir variáveis
+        run: |
+          if [ -z "${{ vars.VITE_SUPABASE_URL }}" ] || [ -z "${{ vars.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "::error::Cadastre VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em Settings > Secrets and variables > Actions > Variables"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
