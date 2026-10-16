@@ -12,7 +12,7 @@ de cada perfil.
 A cada alteração enviada para a branch `main`, o GitHub Actions monta o
 sistema e publica no GitHub Pages. As variáveis `VITE_SUPABASE_URL` e
 `VITE_SUPABASE_ANON_KEY` ficam nas configurações do repositório
-(Settings > Secrets and variables > Actions > Variables).
+(Settings > Secrets and variables > Actions > aba Secrets). A chave `service_role` nunca entra, nem em Secrets.
 
 ## Regras
 
