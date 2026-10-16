@@ -1,5 +1,5 @@
 # Publica o sistema no GitHub Pages a cada alteração enviada para a main.
-# Valores necessários em Settings > Secrets and variables > Actions > Variables:
+# Valores em Settings > Secrets and variables > Actions > aba Secrets:
 #   VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (chave pública; nunca a service_role)
 name: Publicar no GitHub Pages
 
@@ -17,6 +17,10 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+  VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
 jobs:
   publicar:
     runs-on: ubuntu-latest
@@ -31,15 +35,11 @@ jobs:
           cache: npm
       - name: Conferir variáveis
         run: |
-          if [ -z "${{ vars.VITE_SUPABASE_URL }}" ] || [ -z "${{ vars.VITE_SUPABASE_ANON_KEY }}" ]; then
-            echo "::error::Cadastre VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em Settings > Secrets and variables > Actions > Variables"
-            exit 1
-          fi
+          [ -n "$VITE_SUPABASE_URL" ] && echo "VITE_SUPABASE_URL encontrada" || echo "::error::VITE_SUPABASE_URL não encontrada em Secrets"
+          [ -n "$VITE_SUPABASE_ANON_KEY" ] && echo "VITE_SUPABASE_ANON_KEY encontrada" || echo "::error::VITE_SUPABASE_ANON_KEY não encontrada em Secrets"
+          [ -n "$VITE_SUPABASE_URL" ] && [ -n "$VITE_SUPABASE_ANON_KEY" ]
       - run: npm ci
       - run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
