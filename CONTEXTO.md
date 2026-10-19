@@ -41,7 +41,7 @@ e anteriores), fora do GitHub.
 | @supabase/supabase-js | 2.45.4 (sessão no navegador, `flowType: 'implicit'`) |
 | pdf-lib | 1.17.1 (geração de PDF no navegador, exposta como `window.PDFLib`) |
 | Node no GitHub Actions | 20 |
-| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b aplicados na homologação |
+| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 aplicados na homologação |
 
 ## 3. Linha do tempo
 
@@ -197,12 +197,19 @@ com a exportação.
 Observação do teste 6: depois de cada publicação, apertar **Ctrl+F5** antes de
 testar; sem isso o navegador pode continuar com a versão anterior.
 
-**Falta testar:** cancelar FDA; editar cadastro (porto, armador,
-navio) e conferir após F5; nova cotação e gerar FDA a partir de PDA; rodada
-completa com usuário **operacional** (deve conseguir lançar e editar; não deve
-validar, finalizar, lançar adiantamento nem reabrir); usuário **leitura**;
-excluir despesa e excluir voucher que têm comprovante (comportamento do banco
-ainda desconhecido); conta bancária nova com dupla conferência (exige segundo
+**Feitos pelo Julio e informados como aprovados em 19/10** (sem roteiro
+registrado aqui): cancelar FDA; editar cadastro (porto, armador, navio) e
+conferir após F5; nova cotação e gerar FDA a partir de PDA; rodada com usuário
+**operacional** (lança e edita; não valida, finaliza, lança adiantamento nem
+reabre) e com usuário **leitura**; excluir despesa e excluir voucher que têm
+comprovante. Na exclusão de voucher, observado em 19/10 (prestação de teste
+reaberta, voucher **validado** com 1 comprovante): o sistema pede confirmação
+("Remover voucher"), o banco aceita, aparece "Voucher removido" e o aviso de
+numeração fora de sequência com o botão **Renumerar**. Consulta no SQL Editor
+mostrou que o arquivo continua no Storage, mas o registro em `attachment`
+some junto com o voucher (seção 9, item 9).
+
+**Falta testar:** conta bancária nova com dupla conferência (exige segundo
 administrador).
 
 ## 9. Erros e correções
@@ -238,6 +245,21 @@ administrador).
    Na primeira tentativa, o Claude pediu o envio sem mostrar o passo a passo;
    nada chegou ao GitHub, e o "verde" do Actions era a publicação de 16/10.
    Depois de cada envio, conferir a data do último commit, não só a cor.
+9. (19/10) Remover um voucher (ou uma despesa) apaga também o
+   registro do comprovante em `attachment`; o arquivo fica no Storage sem
+   nada que aponte para ele. Contraria a regra "comprovantes nunca apagados".
+   O front-end apaga só `voucher` / `voucher_expense` (`colecoes.js`); a
+   remoção vem do banco: `attachment.expense_id` e
+   `voucher_expense.voucher_id` são `on delete cascade` (conferido em 19/10).
+   Nada se perde de fato: o `audit_log` guarda o registro completo
+   (`action = 'delete'`, `before_data`), e o arquivo fica no Storage.
+   Decisão: não mudar a cascata agora (os gatilhos de `attachment` não estão
+   neste repositório e poderiam falhar com `expense_id` vazio). Em vez disso,
+   `database/06_comprovantes_removidos.sql` cria a visão
+   `comprovante_removido`, que lista cada comprovante removido com arquivo,
+   caminho, despesa, voucher e prestação. Aplicado na homologação em 19/10;
+   conferência devolveu 1 linha (o voucher removido no teste,
+   `voucher_removido = true`). Para produção: rodar o 06 depois dos demais.
 
 ## 10. Pendências e próximos passos
 
@@ -249,15 +271,15 @@ cotações ausentes (previsto preservado nos vouchers); copiar 17 comprovantes
 do artifact antigo; NAVIO TESTE não migra para produção.
 
 **Próximos passos:**
-1. Concluir os testes da seção 8.
-2. Definir o segundo administrador.
-3. Copiar os 17 comprovantes para o Storage.
-4. Uso paralelo; criar o projeto de **produção** no Supabase, separado.
-5. Itens de negócio herdados: tarifa dos vigias, vigência do TESC, período
+1. Definir o segundo administrador e fazer o último teste da seção 8 (conta
+   bancária com dupla conferência).
+2. Copiar os 17 comprovantes para o Storage.
+3. Uso paralelo; criar o projeto de **produção** no Supabase, separado.
+4. Itens de negócio herdados: tarifa dos vigias, vigência do TESC, período
    parcial de 6 h, padronização do SWIFT, Funapol por escala ou movimentação,
    tabelas de outros portos, conciliação PDA × FDA, indicadores, integração
    com o ERP.
-6. Depois: MFA para admin e financeiro, domínio próprio, e-mail próprio no
+5. Depois: MFA para admin e financeiro, domínio próprio, e-mail próprio no
    Supabase (o gratuito tem limite de envios), backup com restauração testada.
 
 **Limitações conhecidas do código:** gravações em várias requisições não são
