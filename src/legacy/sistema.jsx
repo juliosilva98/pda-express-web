@@ -5098,8 +5098,17 @@ const salvar=async(id,patch,msg)=>{
 };
 const aprovar=async(rq,role)=>{
   setBusy(true);
-  const nome=(rq.name||'').trim()||(rq.email||'').split('@')[0];
-  const a=await supabase.from('app_user').insert({name:nome,email:rq.email,role,auth_id:rq.external_id});
+  const emailRq=(rq.email||'').trim().toLowerCase();
+  /* já cadastrado em Usuários (convite pendente): liga o login ao cadastro existente em vez de criar outro */
+  const existente=(rows||[]).find(u=>(u.email||'').trim().toLowerCase()===emailRq);
+  if(existente&&existente.auth_id&&existente.auth_id!==rq.external_id){
+    setBusy(false);
+    return toast(`${existente.name} já está ligado a outro login. Confira o cadastro antes de liberar.`,'bad');
+  }
+  const nome=existente?existente.name:((rq.name||'').trim()||emailRq.split('@')[0]);
+  const a=existente
+    ?await supabase.from('app_user').update({auth_id:rq.external_id,role,active:true}).eq('id',existente.id)
+    :await supabase.from('app_user').insert({name:nome,email:rq.email,role,auth_id:rq.external_id});
   if(a.error){ setBusy(false); return erro(a.error); }
   await supabase.from('access_request').update({status:'approved',granted_role:role,decided_by:meId,decided_at:new Date().toISOString()}).eq('id',rq.id);
   setBusy(false); toast(`Acesso liberado para ${nome} — ${ROLES[role].label}`,'ok'); carregar();

@@ -270,6 +270,17 @@ administrador).
    caminho, despesa, voucher e prestação. Aplicado na homologação em 19/10;
    conferência devolveu 1 linha (o voucher removido no teste,
    `voucher_removido = true`). Para produção: rodar o 06 depois dos demais.
+10. (19/10) Usuária cadastrada em Usuários ("convite pendente") conseguiu
+   entrar, mas o login **não** foi ligado ao cadastro: ela caiu em
+   "Solicitações de acesso". Ao clicar em "Liberar como…", o sistema tentava
+   **criar outro** `app_user` com o mesmo e-mail e o banco recusou
+   (`app_user_email_key`). Corrigido em `sistema.jsx` (`aprovar`): se já
+   existe cadastro com o mesmo e-mail sem login, liga o login a ele
+   (`auth_id`, perfil, ativo) em vez de inserir; se o cadastro já está ligado
+   a outro login, avisa e não faz nada. **Em aberto:** por que a ligação
+   automática não aconteceu no primeiro login (regra do banco, arquivos 01–03,
+   fora deste repositório) e se o banco permite ao admin gravar `auth_id`
+   — confirmar no site.
 
 ## 10. Pendências e próximos passos
 
@@ -360,7 +371,9 @@ centavos). O banco continua guardando `amount_brl` e `roe` (o fechamento, a
 impressão digital e os PDFs não mudaram); o US$ digitado vai em `usd`
 (`fda_advance.extra`). Adiantamento antigo, lançado em R$, abre com o US$
 calculado (R$ ÷ ROE) e, se não mudar US$ nem ROE, mantém o R$ original sem
-arredondar. 1 teste novo (24 no total).
+arredondar. 1 teste novo (24 no total). Publicado em 19/10 (commit
+`30025bd`) e conferido na homologação sem salvar: campo "Valor recebido US$",
+US$ 1.000 × ROE 5,1 → "Convertido: R$ 5.100,00".
 
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
 mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.
