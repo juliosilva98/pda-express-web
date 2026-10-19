@@ -2821,7 +2821,8 @@ const BLANK_FDA=(co)=>({
   createdAt:new Date().toISOString()
 });
 
-function FdaModule({pending,onCreated,onCancelPending,companies,shipowners}){
+/* tipo 'fda' (aba FDAs) ou 'sda' (aba SDAs): cada aba lista só as suas prestações */
+function FdaModule({tipo='fda',pending,onCreated,onCancelPending,companies,shipowners,abrirId,onAberto,onIrPara}){
 const R=useRole();
 const caps=useCaps();
 const [fdas,setFdas]=useState(null);
@@ -2900,6 +2901,10 @@ useEffect(()=>{
     ()=>setFdas([]));
   return un;
 },[caps.ready,caps.db]);
+/* pedido vindo de outra aba (ex.: SDA criada a partir de um FDA): abre a prestação aqui */
+useEffect(()=>{
+  if(abrirId&&fdas&&fdas.some(x=>x.id===abrirId)){ setOpenId(abrirId); onAberto&&onAberto(); }
+},[abrirId,fdas]);
 /* vouchers de todas as prestações — alimentam o andamento na lista */
 useEffect(()=>{
   if(!caps.ready||!caps.db)return;
@@ -2930,8 +2935,10 @@ if(openId){
 
 const create=async d=>{
   const ref=await caps.db.collection('fdas').add(d);
-  setCreating(false); setOpenId(ref.id);
-  toast(isSda(d)?'SDA criada':'Prestação criada','ok');
+  setCreating(false);
+  /* SDA criada na aba FDAs vai para a aba SDAs */
+  if(isSda(d)&&tipo!=='sda'&&onIrPara)onIrPara('sda',ref.id); else setOpenId(ref.id);
+  toast(isSda(d)?'SDA criada — ela fica na aba SDAs':'Prestação criada','ok');
 };
 /* SDA a partir de um FDA finalizado: herda só o cabeçalho; invoice, adiantamentos e vouchers começam vazios */
 const gerarSda=f=>{
@@ -2979,16 +2986,19 @@ const duplicate=async f=>{
 
 return(
 <div className="card">
-<div className="card-head"><div><h2>Prestações de contas</h2>
-<div className="sub">Final Disbursement Account (FDA) e Supplementary Disbursement Account (SDA) por escala</div></div>
-{R.can('fda_editar')&&<div className="actions">
-<button className="btn btn-line btn-sm" onClick={()=>setCreating({kind:'sda'})}>Nova SDA avulsa</button>
-<button className="btn btn-primary btn-sm" onClick={()=>setCreating(true)}>Nova FDA</button></div>}</div>
+{tipo==='sda'
+?<div className="card-head"><div><h2>Prestações suplementares (SDA)</h2>
+<div className="sub">Supplementary Disbursement Account — depois do FDA finalizado, a partir dele ou avulsa</div></div>
+{R.can('fda_editar')&&<button className="btn btn-primary btn-sm" onClick={()=>setCreating({kind:'sda'})}>Nova SDA avulsa</button>}</div>
+:<div className="card-head"><div><h2>Prestações de contas</h2>
+<div className="sub">Final Disbursement Account por escala</div></div>
+{R.can('fda_editar')&&<button className="btn btn-primary btn-sm" onClick={()=>setCreating(true)}>Nova FDA</button>}</div>}
 
 {(()=>{
 const normF=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const vOf=id=>(allV||[]).filter(v=>v.fdaId===id);
-const abertas=fdas.filter(f=>!isClosed(f)), fechadas=fdas.filter(isClosed);
+const doTipo=fdas.filter(f=>tipo==='sda'?isSda(f):!isSda(f));
+const abertas=doTipo.filter(f=>!isClosed(f)), fechadas=doTipo.filter(isClosed);
 const base=(aba==='closed'?fechadas:abertas).filter(f=>!busca.trim()||normF(busca).split(/\s+/).every(t=>normF([f.vessel,f.voyage,f.invoiceNo,f.to].join(' ')).includes(t)));
 const lista=base.slice().sort((x,y)=>String(aba==='closed'?y.closedAt||'':y.createdAt||'').localeCompare(String(aba==='closed'?x.closedAt||'':x.createdAt||'')));
 return(<>
@@ -2996,14 +3006,16 @@ return(<>
 <button className={aba==='open'?'active':''} onClick={()=>setAba('open')}>Em elaboração · {abertas.length}</button>
 <button className={aba==='closed'?'active':''} onClick={()=>setAba('closed')}>Finalizadas · {fechadas.length}</button>
 </div>
-{fdas.length>0&&<div className="hist-tools">
-<input className="inp" value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Filtrar por navio, viagem, invoice ou armador" aria-label="Filtrar FDAs"/>
+{doTipo.length>0&&<div className="hist-tools">
+<input className="inp" value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Filtrar por navio, viagem, invoice ou armador" aria-label={tipo==='sda'?'Filtrar SDAs':'Filtrar FDAs'}/>
 {busca&&<button className="btn btn-line btn-sm" onClick={()=>setBusca('')}>Limpar</button>}
 <span style={{fontSize:'.8rem',color:'var(--fg-muted)',marginLeft:'auto'}}>{lista.length} de {aba==='closed'?fechadas.length:abertas.length}</span>
 </div>}
 {lista.length===0
  ?(aba==='closed'
-   ?<Empty title="Nenhuma prestação finalizada" text="Quando todas as condições forem atendidas, finalize a prestação na aba Fechamento da FDA."/>
+   ?<Empty title={tipo==='sda'?'Nenhuma SDA finalizada':'Nenhuma prestação finalizada'} text={'Quando todas as condições forem atendidas, finalize a prestação na aba Fechamento da '+(tipo==='sda'?'SDA.':'FDA.')}/>
+   :tipo==='sda'
+   ?<Empty title="Nenhuma SDA em elaboração" text="Crie uma SDA avulsa ou gere uma a partir de um FDA finalizado (aba FDAs › Finalizadas › ⋯ › Gerar SDA)."/>
    :<Empty title="Nenhuma prestação em elaboração" text="Crie uma FDA ou gere uma a partir de um PDA aprovado."/>)
  :aba==='open'
  ?<div className="tscroll"><table>
@@ -5242,6 +5254,8 @@ const editFromHistory=q=>{
 
 /* Conversão PDA → FDA: o pedido viaja ao módulo FDA, que tem acesso ao banco */
 const [pendingFda,setPendingFda]=useState(null);
+/* prestação a abrir quando a navegação troca de aba (ex.: SDA recém-criada a partir de um FDA) */
+const [abrirPrest,setAbrirPrest]=useState(null);
 const openFdaFromQuote=(q,terminalName)=>{ setPendingFda({quote:q,terminalName}); setArea('op'); setTab('fda'); };
 const fdaCreated=(quoteId,fdaId)=>{
   setPendingFda(null);
@@ -5249,7 +5263,7 @@ const fdaCreated=(quoteId,fdaId)=>{
 };
 
 const OP_TABS=[...(R.can('cotar')?[['quote',editQuote?'Editando cotação':'Nova cotação',null]]:[]),
-  ['history','PDAs',quotations.length],['fda','FDAs',null]];
+  ['history','PDAs',quotations.length],['fda','FDAs',null],['sda','SDAs',null]];
 useEffect(()=>{ if(!R.can('cotar')&&tab==='quote')setTab('history'); if(!R.can('cadastros')&&area==='cad')setArea('op'); },[R.role]);
 const counts={company:companies.length,owners:shipowners.length,vessels:vessels.length,ports:ports.length,
   terminals:terminals.length,suppliers:suppliers.length,
@@ -5281,7 +5295,7 @@ return(
 
 {R.can('cadastros')&&<div className="areas">
 <button className={area==='op'?'active':''} onClick={()=>setArea('op')}>
-<span className="a-tag">Operação</span><span className="a-name">Cotações (PDA) e prestações de contas (FDA)</span></button>
+<span className="a-tag">Operação</span><span className="a-name">Cotações (PDA) e prestações de contas (FDA e SDA)</span></button>
 <button className={area==='cad'?'active':''} onClick={()=>setArea('cad')}>
 <span className="a-tag">Cadastros
 {pend.length>0&&<span className={'a-badge '+(pendGraves?'bad':'warn')}>{pend.length}</span>}</span>
@@ -5302,8 +5316,11 @@ return(
   ports={ports} terminals={terminals} shipowners={shipowners}
   vessels={vessels} suppliers={suppliers} onSave={saveQuote}/>}
 {tab==='history'&&<HistoryModule quotations={quotations} setQuotations={setQuotations} onOpenFda={openFdaFromQuote} onEdit={editFromHistory}/>}
-{tab==='fda'&&<FdaModule pending={pendingFda} onCreated={fdaCreated} onCancelPending={()=>setPendingFda(null)}
-  companies={companies} shipowners={shipowners}/>}
+{tab==='fda'&&<FdaModule tipo="fda" pending={pendingFda} onCreated={fdaCreated} onCancelPending={()=>setPendingFda(null)}
+  companies={companies} shipowners={shipowners}
+  onIrPara={(t,id)=>{ setAbrirPrest(id); setTab(t); }}/>}
+{tab==='sda'&&<FdaModule tipo="sda" companies={companies} shipowners={shipowners}
+  abrirId={abrirPrest} onAberto={()=>setAbrirPrest(null)}/>}
 </>}
 
 {area==='cad'&&R.can('cadastros')&&<div className="cad">

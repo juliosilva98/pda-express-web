@@ -19,8 +19,9 @@ e anteriores), fora do GitHub.
 - Testes manuais 1 a 6 aprovados no site (seção 8). O teste 6 (finalizar e
   reabrir) passou depois que as correções de 19/10 foram enviadas ao GitHub
   (seção 9, itens 6 e 8).
-- Último envio ao GitHub: 19/10/2026 (commit `b9195fd`, "Add files via
-  upload").
+- Último envio ao GitHub: 19/10/2026 (commit `004b33f`, "Add files via
+  upload"). Esta versão do CONTEXTO.md, com o fechamento do dia, vai no
+  próximo envio da pasta `docs`.
 - No computador do Julio não há Git. Os envios são feitos pelo site do GitHub
   (Add file › Upload files), e a cópia de trabalho fica em
   `OneDrive - Seatrade\Projeto gestão de Custeio Seatrade\pda-express-web`.
@@ -30,10 +31,10 @@ e anteriores), fora do GitHub.
   sincronizar `node_modules`; e `%LOCALAPPDATA%` não serve para o build porque
   o app do Claude redireciona essa pasta e o Vite falha). Ver "Comandos" no
   `CLAUDE.md`.
-- **Pacote de mudanças de 19/10 à tarde (não publicado ainda):** nome do
-  sistema → "Gestão de Custeio Seatrade"; menu ⋯ na coluna Ações; pré-
-  visualização dos PDFs; cabeçalho do FDA buscando PDA e navio; SDA
-  (seção 12). Exige rodar o `database/07_sda.sql` antes de usar a SDA.
+- **Pacote de mudanças de 19/10 à tarde, publicado e testado na
+  homologação:** nome do sistema → "Gestão de Custeio Seatrade"; menu ⋯ na
+  coluna Ações; pré-visualização dos PDFs; cabeçalho do FDA buscando PDA e
+  navio; SDA (seção 12). `database/07_sda.sql` aplicado na homologação.
 - **Produção ainda não existe.** Tudo o que está no ar é homologação.
 - Decisão de 19/10: o trabalho continua **só neste repositório**
   (`pda-express-web`). O repositório privado `pda-express` fica como arquivo
@@ -50,7 +51,7 @@ e anteriores), fora do GitHub.
 | @supabase/supabase-js | 2.45.4 (sessão no navegador, `flowType: 'implicit'`) |
 | pdf-lib | 1.17.1 (geração de PDF no navegador, exposta como `window.PDFLib`) |
 | Node no GitHub Actions | 20 |
-| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 aplicados na homologação; 07 (SDA) escrito, ainda não aplicado |
+| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 → 07 (SDA) aplicados na homologação |
 
 ## 3. Linha do tempo
 
@@ -328,8 +329,8 @@ as 3 páginas e Fechar não baixa nem deixa o botão travado; "Preencher a
 partir de" › Cotação preenche navio, porto, câmbio, GRT, DWT e LOA. **Erro
 encontrado e corrigido:** a cotação escolhida tinha um armador desativado no
 cadastro, e a Fatura e remessa ficava vazia; agora usa, como a geração a
-partir do PDA, a cópia do armador guardada na cotação (correção ainda não
-publicada). **SDA salva (com OK do Julio):** "Gerar SDA" a partir do FDA de
+partir do PDA, a cópia do armador guardada na cotação (publicada em 19/10,
+commit `004b33f`). **SDA salva (com OK do Julio):** "Gerar SDA" a partir do FDA de
 teste TESTE2613 com invoice `SDA-TESTE-1` → mensagem "SDA criada", etiqueta
 SDA, link "complementar ao FDA", 0 vouchers; no banco `kind = 'sda'`, aberta,
 `parent_fda_id` = FDA finalizado. Essa SDA de teste fica na homologação
@@ -337,10 +338,15 @@ SDA, link "complementar ao FDA", 0 vouchers; no banco `kind = 'sda'`, aberta,
 SDA com origem num FDA **aberto** (NAVIO TESTE) foi recusado com "A SDA só
 pode partir de um FDA finalizado" e nada foi criado. **Ajuste:** os botões da
 Main Cover diziam "Gerar FDA em PDF" / "FDA + comprovantes" também na SDA;
-agora usam a sigla (correção não publicada). **Não visto na tela:** o título
+agora usam a sigla (publicada em 19/10, commit `004b33f`). **Não visto na tela:** o título
 "SUPPLEMENTARY DISBURSEMENT ACCOUNT" no PDF — a SDA de teste não tem vouchers
 validados, e sem isso o sistema não emite o PDF.
 
+**Decisão do Julio (19/10): a SDA tem lista própria.** Aba **SDAs** no topo,
+ao lado de FDAs (mesmo componente `FdaModule`, com `tipo="sda"`; cada aba
+lista só o seu tipo, com Em elaboração / Finalizadas). A aba FDAs ficou só com
+"Nova FDA"; "Nova SDA avulsa" está na aba SDAs; "Gerar SDA" continua no ⋯ do
+FDA finalizado e, ao salvar, leva para a aba SDAs com a SDA aberta.
+
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
-mesmas do FDA: `fda_editar` etc.); se a SDA deve aparecer numa aba própria;
-numeração própria de invoice para SDA.
+mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.
