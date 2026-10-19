@@ -433,7 +433,7 @@ const downloads = {
     const a = document.createElement('a'); a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-    return { ok: true };
+    return { status: 'saved', ok: true };   // o sistema só registra o PDF gerado com status 'saved'
   },
 };
 

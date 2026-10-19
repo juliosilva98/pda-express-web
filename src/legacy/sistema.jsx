@@ -2720,7 +2720,7 @@ const COA={
    Plano de contas G2 extraído do template do armador
    ============================================================ */
 /* Correspondência entre os custos do PDA e o plano de contas do armador.
-   Confirmado contra a prestação da CANELO ARROW 2509. */
+   Confirmado contra uma prestação real de 2025 (referência no registro privado). */
 const ACCT={
   pilotage:'4122101', shift:'4122102', towage:'4122103', mooring:'4122108',
   tuf:'4122004', access_channel:'4122007', wharfage:'4122001',
@@ -3922,7 +3922,7 @@ return(
 
 {sec==='vessel'&&<>
 <div className="grid">
-<div className="field"><label>Navio *</label><input value={f.vessel} onChange={e=>s('vessel',e.target.value)} placeholder="Ex: CANELO ARROW"/></div>
+<div className="field"><label>Navio *</label><input value={f.vessel} onChange={e=>s('vessel',e.target.value)} placeholder="Ex: NAVIO EXEMPLO"/></div>
 <div className="field"><label>Viagem</label><input value={f.voyage} onChange={e=>s('voyage',e.target.value)} placeholder="Ex: 2509"/></div>
 <div className="field"><label>Porto</label><input value={f.port} onChange={e=>s('port',e.target.value)} placeholder="Ex: São Francisco do Sul/Brazil"/></div>
 <div className="field"><label>ROE · câmbio da prestação</label><input type="number" step="0.0001" value={f.roe} onChange={e=>s('roe',Number(e.target.value)||0)}/></div>
