@@ -182,7 +182,7 @@ imita essas duas interfaces e traduz para tabelas:
 
 ## 8. Testes
 
-**Automáticos (`npm test`, 23 testes, banco falso em memória):** adiantamento
+**Automáticos (`npm test`, 24 testes, banco falso em memória):** adiantamento
 (editar sem duplicar, incluir, excluir); despesa de voucher validado alterada
 por operacional; validação recusada sem permissão; voucher manual por perfil;
 despesas do PDA num envio, na ordem, editáveis; renumerar sem regravar
@@ -347,6 +347,20 @@ ao lado de FDAs (mesmo componente `FdaModule`, com `tipo="sda"`; cada aba
 lista só o seu tipo, com Em elaboração / Finalizadas). A aba FDAs ficou só com
 "Nova FDA"; "Nova SDA avulsa" está na aba SDAs; "Gerar SDA" continua no ⋯ do
 FDA finalizado e, ao salvar, leva para a aba SDAs com a SDA aberta.
+Publicado em 19/10 (commit `c4118d8`) e conferido na homologação: aba SDAs
+com a SDA de teste (origem "Do FDA …"), aba FDAs com 11 em elaboração e 1
+finalizada, sem nenhuma SDA, e só o botão "Nova FDA". Não testado na tela: o
+salto automático para a aba SDAs ao salvar um "Gerar SDA" (exigiria criar
+outra SDA).
+
+**Adiantamento em US$ (pedido do Julio, 19/10):** na Conciliação, o
+formulário de adiantamento pede **Valor recebido US$** e a ROE do
+recebimento, e mostra o valor convertido em R$ (US$ × ROE, arredondado a
+centavos). O banco continua guardando `amount_brl` e `roe` (o fechamento, a
+impressão digital e os PDFs não mudaram); o US$ digitado vai em `usd`
+(`fda_advance.extra`). Adiantamento antigo, lançado em R$, abre com o US$
+calculado (R$ ÷ ROE) e, se não mudar US$ nem ROE, mantém o R$ original sem
+arredondar. 1 teste novo (24 no total).
 
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
 mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.

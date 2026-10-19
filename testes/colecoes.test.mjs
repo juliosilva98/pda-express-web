@@ -24,6 +24,14 @@ conf('incluir adiantamento novo', DB.fda_advance.length === 2);
 f = (await db.doc('fdas/f1').get()).data();
 await db.doc('fdas/f1').update({ advances: f.advances.filter((a) => a.id !== 'novo1') });
 conf('excluir adiantamento', DB.fda_advance.length === 1 && DB.fda_advance[0].id === 'a-uuid-1');
+// adiantamento informado em US$: grava o R$ convertido e guarda o US$ digitado (extra.usd), lido de volta
+f = (await db.doc('fdas/f1').get()).data();
+await db.doc('fdas/f1').update({ advances: [...f.advances, { id: 'usd1', label: 'Adto USD', date: '2026-10-03', usd: 31.37, brl: 159.99, roe: 5.1 }] });
+const linhaUsd = DB.fda_advance.find((x) => x.legacy_id === 'usd1');
+f = (await db.doc('fdas/f1').get()).data();
+conf('adiantamento em US$ grava R$ e guarda o US$', linhaUsd && linhaUsd.amount_brl === 159.99 && linhaUsd.extra && linhaUsd.extra.usd === 31.37
+  && f.advances.find((a) => a.id === 'usd1').usd === 31.37);
+await db.doc('fdas/f1').update({ advances: f.advances.filter((a) => a.id !== 'usd1') });
 
 // 2) operacional altera despesa de voucher validado: banco reabre, sem erro de permissão
 let v = (await db.doc('vouchers/v1').get()).data();

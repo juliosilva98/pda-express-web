@@ -76,7 +76,7 @@ As regras de segurança (arquivos 01, 02 e 03) estão no repositório privado
 ```
 npm ci
 npm run build      # precisa de VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (valores falsos bastam para compilar)
-npm test           # 23 testes; todos devem passar
+npm test           # 24 testes; todos devem passar
 npm run dev        # local; com .env apontando para a homologação
 ```
 

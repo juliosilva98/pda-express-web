@@ -3444,15 +3444,22 @@ No PDF, a Main Cover continua trazendo os adiantamentos e o Total Due.
 /* ---------- Conciliação: débitos (despesas) x créditos (adiantamentos) ---------- */
 const advUsdOf=(a,fda)=>Number(a.brl||0)/Number(a.roe||fda.roe||1);
 
+/* O valor é informado em dólar e convertido para real pela ROE do recebimento.
+   O banco continua guardando o valor em R$ (e a ROE); o US$ digitado vai junto, em `usd`. */
+const arred2=n=>Math.round((Number(n)||0)*100)/100;
 function AdvanceDialog({item,isNew,fda,onSave,onClose}){
-const [f,setF]=useState(()=>({...item}));
+const usdIni=item.usd!==undefined&&item.usd!==null&&item.usd!==''?Number(item.usd)
+  :(Number(item.brl)>0&&Number(item.roe)>0?arred2(Number(item.brl)/Number(item.roe)):'');
+const [f,setF]=useState(()=>({...item,usd:usdIni}));
 const set=(k,v)=>setF(p=>({...p,[k]:v}));
+/* adiantamento antigo (lançado em R$) sem mudança de US$ nem de ROE: mantém o R$ original, sem arredondar */
+const semMudanca=!isNew&&Number(item.brl)>0&&Number(f.usd)===Number(usdIni)&&Number(f.roe)===Number(item.roe);
+const brl=semMudanca?Number(item.brl):arred2(Number(f.usd||0)*Number(f.roe||0));
 const save=()=>{
-  if(!(Number(f.brl)>0))return toast('Informe o valor recebido','bad');
+  if(!(Number(f.usd)>0))return toast('Informe o valor recebido em US$','bad');
   if(!(Number(f.roe)>0))return toast('Informe a ROE do recebimento','bad');
-  onSave({...f,brl:Number(f.brl),roe:Number(f.roe)});
+  onSave({...f,usd:Number(f.usd),brl,roe:Number(f.roe)});
 };
-const usd=Number(f.brl||0)/Number(f.roe||1);
 return(
 <ItemDialog title={isNew?'Novo adiantamento':'Editar adiantamento'} sub={f.label||''} onSave={save} onClose={onClose}>
 <div className="grid-s">
@@ -3460,15 +3467,16 @@ return(
 <input value={f.label||''} placeholder="Ex: Adto 01" onChange={e=>set('label',e.target.value)}/></div>
 <div className="field"><label>Data do crédito</label>
 <input type="date" value={f.date||''} onChange={e=>set('date',e.target.value)}/></div>
-<div className="field"><label>Valor recebido R$</label>
-<input type="number" step="0.01" value={f.brl||''} onChange={e=>set('brl',e.target.value)}/></div>
+<div className="field"><label>Valor recebido US$</label>
+<input type="number" step="0.01" value={f.usd===''||f.usd==null?'':f.usd} onChange={e=>set('usd',e.target.value)}/></div>
 <div className="field"><label>ROE do recebimento</label>
 <input type="number" step="0.0001" value={f.roe||''} onChange={e=>set('roe',e.target.value)}/></div>
 </div>
 <div className="field"><label>Observação</label>
 <input value={f.note||''} placeholder="Ex: TED, ref. armador" onChange={e=>set('note',e.target.value)}/></div>
-<p style={{fontSize:'.8rem',color:'var(--fg-muted)'}}>Equivale a <strong className="num">{fUSD(usd)}</strong>
-{Number(f.roe)&&Number(f.roe)!==Number(fda.roe)?<> · pela ROE da FDA ({fda.roe}) seria <span className="num">{fUSD(Number(f.brl||0)/Number(fda.roe||1))}</span></>:null}</p>
+<p style={{fontSize:'.8rem',color:'var(--fg-muted)'}}>Convertido: <strong className="num">{fBRL(brl)}</strong>
+{' '}(US$ × ROE {f.roe||'—'})
+{Number(f.roe)&&Number(f.roe)!==Number(fda.roe)?<> · pela ROE da FDA ({fda.roe}) seria <span className="num">{fBRL(arred2(Number(f.usd||0)*Number(fda.roe||0)))}</span></>:null}</p>
 </ItemDialog>);
 }
 
