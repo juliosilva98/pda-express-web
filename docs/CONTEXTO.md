@@ -317,10 +317,29 @@ de cálculo não foi tocado.
 | Cabeçalho do FDA | Na aba Escala, painel "Preencher a partir de": **Cotação (PDA)** preenche navio, viagem, porto, câmbio, medidas, quantidades e liga o FDA ao PDA (`pdaId`); se a cotação tem armador, também a Fatura e remessa. **Navio cadastrado** preenche nome e medidas e, pelo armador do navio, a Fatura e remessa. O seletor de armador na Fatura e remessa continua. Ligar um FDA manual a um PDA **não** marca a cotação como "já tem FDA" (o botão Gerar FDA continua aparecendo nela) | `sistema.jsx` (`FdaHeaderDialog`, contexto `FontesFdaCtx`) |
 | SDA | Mesma tabela e mesmas telas do FDA, com `kind = 'sda'` e `parent_fda_id`. Criar: **Nova SDA avulsa** (topo da lista) ou **Gerar SDA** no ⋯ de um FDA finalizado — herda só o cabeçalho (`CAMPOS_CABECALHO`); invoice, adiantamentos e vouchers começam vazios. Etiqueta SDA nas listas e no detalhe, link para o FDA de origem, PDF com título "SUPPLEMENTARY DISBURSEMENT ACCOUNT" e arquivo "SDA - …". Banco: `database/07_sda.sql` (colunas, restrições e gatilho `trg_fda_sda`: origem precisa ser FDA finalizado; tipo não muda). O front só envia `kind`/`parent_fda_id` quando o documento tem esses campos, então FDAs continuam funcionando mesmo antes do 07 | `sistema.jsx`, `colecoes.js`, `07_sda.sql`; 4 testes |
 
-**Conferido aqui:** `npm run build` e `npm test` (23 testes). **Não
-conferido:** aparência e cliques no site (precisa de login) e o `07_sda.sql`
-num PostgreSQL real — roteiro de teste na homologação depois de rodar o 07 e
-publicar.
+**Conferido aqui:** `npm run build` e `npm test` (23 testes).
+
+**Na homologação (19/10, 07 aplicado; commit `e113330`), Claude no navegador
+do app com o Julio logado como admin:** nome novo no login e no topo; menu ⋯
+abre (para cima perto do fim da tela) e fecha com Esc; "Gerar SDA" aparece só
+no FDA finalizado; formulário "Nova SDA" com aviso do FDA de origem, cabeçalho
+e Fatura e remessa herdados, invoice vazia; pré-visualização do PDF abre com
+as 3 páginas e Fechar não baixa nem deixa o botão travado; "Preencher a
+partir de" › Cotação preenche navio, porto, câmbio, GRT, DWT e LOA. **Erro
+encontrado e corrigido:** a cotação escolhida tinha um armador desativado no
+cadastro, e a Fatura e remessa ficava vazia; agora usa, como a geração a
+partir do PDA, a cópia do armador guardada na cotação (correção ainda não
+publicada). **SDA salva (com OK do Julio):** "Gerar SDA" a partir do FDA de
+teste TESTE2613 com invoice `SDA-TESTE-1` → mensagem "SDA criada", etiqueta
+SDA, link "complementar ao FDA", 0 vouchers; no banco `kind = 'sda'`, aberta,
+`parent_fda_id` = FDA finalizado. Essa SDA de teste fica na homologação
+(prestação não se exclui; pode ser cancelada). **Recusa do banco:** inserir
+SDA com origem num FDA **aberto** (NAVIO TESTE) foi recusado com "A SDA só
+pode partir de um FDA finalizado" e nada foi criado. **Ajuste:** os botões da
+Main Cover diziam "Gerar FDA em PDF" / "FDA + comprovantes" também na SDA;
+agora usam a sigla (correção não publicada). **Não visto na tela:** o título
+"SUPPLEMENTARY DISBURSEMENT ACCOUNT" no PDF — a SDA de teste não tem vouchers
+validados, e sem isso o sistema não emite o PDF.
 
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
 mesmas do FDA: `fda_editar` etc.); se a SDA deve aparecer numa aba própria;

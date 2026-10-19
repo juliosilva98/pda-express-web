@@ -69,11 +69,40 @@ r = await db.collection('vouchers').add({ fdaId: 'f1', number: 10, group: 'misc'
 conf('4129301 no grupo misc grava a conta do misc', DB.voucher.find((x) => x.id === r.id).account_ref === 'X-misc-01');
 r = await db.collection('vouchers').add({ fdaId: 'f1', number: 11, group: 'cargo_load', accountRef: '4129301', accountName: 'Freight Tax', expenses: [], source: 'manual', status: 'pending' });
 conf('4129301 no grupo cargo_load grava a conta do cargo_load', DB.voucher.find((x) => x.id === r.id).account_ref === '4129301');
+// 10) SDA: grava tipo e FDA de origem; FDA comum não envia as colunas novas (funciona sem o arquivo 07)
+r = await db.collection('fdas').add({ vessel: 'NAVIO TESTE', to: 'Empresa Teste Ltda', roe: 5, kind: 'sda', parentFdaId: 'f1' });
+const sdaRow = DB.fda.find((x) => x.id === r.id);
+conf('SDA grava kind e parent_fda_id', sdaRow.kind === 'sda' && sdaRow.parent_fda_id === 'f1' && !(sdaRow.extra && ('kind' in sdaRow.extra)));
+const sdaDoc = (await db.doc('fdas/' + r.id).get()).data();
+conf('SDA lida de volta com kind e parentFdaId', sdaDoc.kind === 'sda' && sdaDoc.parentFdaId === 'f1');
+r = await db.collection('fdas').add({ vessel: 'NAVIO TESTE', to: 'Empresa Teste Ltda', roe: 5 });
+conf('FDA comum não envia kind nem parent_fda_id', !('kind' in DB.fda.find((x) => x.id === r.id)) && !('parent_fda_id' in DB.fda.find((x) => x.id === r.id)));
+ctx.log.length = 0;
+await db.doc('fdas/' + sdaRow.id).update({ remarks: 'teste' });
+await espera(500);
+conf('editar SDA não regrava o tipo', !('kind' in (DB.fda.find((x) => x.id === sdaRow.id).extra || {})) && DB.fda.find((x) => x.id === sdaRow.id).kind === 'sda');
 // 8) download de PDF responde 'saved': sem isso o sistema não registra a geração e a FDA não finaliza
 document.createElement = () => ({ click() {}, remove() {} }); document.body = { appendChild() {} };
 URL.createObjectURL = () => 'blob:x'; URL.revokeObjectURL = () => {};
 const dl = await window.claude.use('downloads');
 const out = await dl.save({ filename: 'teste.pdf', data: new Blob(['x']) });
 conf('download de PDF confirma status saved', out && out.status === 'saved');
+// 9) PDF abre pré-visualização: só conta como gerado se a pessoa clicar em Baixar
+const criados = [];
+document.createElement = (tag) => { const e = { tag, children: [], appendChild(c) { this.children.push(c); }, click() { this.clicado = true; }, remove() { this.removido = true; } }; criados.push(e); return e; };
+document.addEventListener = () => {}; document.removeEventListener = () => {};
+const pdf = () => new Blob(['%PDF'], { type: 'application/pdf' });
+const botao = (txt) => criados.find((e) => e.tag === 'button' && e.textContent === txt);
+let p = dl.save({ filename: 'a.pdf', data: pdf() });
+await new Promise((ok) => setTimeout(ok, 0));
+conf('PDF abre a pré-visualização sem baixar', !!botao('Baixar') && !criados.some((e) => e.tag === 'a'));
+botao('Fechar').onclick();
+conf('fechar a pré-visualização não conta como gerado', (await p).status === 'cancelled' && !criados.some((e) => e.tag === 'a'));
+criados.length = 0;
+p = dl.save({ filename: 'b.pdf', data: pdf() });
+await new Promise((ok) => setTimeout(ok, 0));
+botao('Baixar').onclick();
+const res = await p;
+conf('Baixar na pré-visualização baixa e confirma saved', res.status === 'saved' && criados.some((e) => e.tag === 'a' && e.clicado));
 console.log(falhas ? `\n${falhas} falha(s)` : '\nTodos os testes passaram');
 process.exit(falhas ? 1 : 0);

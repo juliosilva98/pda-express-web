@@ -3420,9 +3420,9 @@ No PDF, a Main Cover continua trazendo os adiantamentos e o Total Due.
    </div>}
 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
 <button className="btn btn-primary btn-sm" disabled={busy||!caps.downloads||!tudoValidado||!R.can('fda_emitir')}
-  onClick={()=>exportFda(false)}>{busy?'Gerando...':'Gerar FDA em PDF'}</button>
+  onClick={()=>exportFda(false)}>{busy?'Gerando...':'Gerar '+siglaDe(fda)+' em PDF'}</button>
 <button className="btn btn-line btn-sm" disabled={busy||!caps.downloads||!tudoValidado||nDocs===0||!R.can('fda_emitir')}
-  onClick={()=>exportFda(true)}>FDA + comprovantes{nDocs?` (${nDocs})`:''}</button>
+  onClick={()=>exportFda(true)}>{siglaDe(fda)} + comprovantes{nDocs?` (${nDocs})`:''}</button>
 {!caps.downloads&&<span style={{fontSize:'.8rem',color:'var(--fg-muted)',alignSelf:'center'}}>
   Download indisponível nesta visualização.</span>}
 </div>
@@ -4002,7 +4002,9 @@ const pickPda=id=>{
   if(!q)return;
   const v=q.vessel||{};
   const terms=Object.keys(q.terminalResults||{});
-  const so=shipowners.find(x=>x.id===(q.shipowner||{}).id)||null;
+  /* como na geração a partir do PDA: cadastro atual do armador; se ele saiu do cadastro, a cópia guardada na cotação */
+  const so=shipowners.find(x=>x.id===(q.shipowner||{}).id)||shipowners.find(x=>x.id===v.shipownerId)
+    ||(q.shipowner&&(q.shipowner.legalName||q.shipowner.name)?q.shipowner:null);
   const op=v.operation;
   setF(p=>({...p,
     vessel:v.name||p.vessel, voyage:v.voy||p.voyage, port:portoDe(q)||p.port,
