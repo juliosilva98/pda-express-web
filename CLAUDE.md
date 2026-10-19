@@ -47,7 +47,7 @@ As regras de segurança (arquivos 01, 02 e 03) estão no repositório privado
 
 - Não presuma regras do banco: quando o comportamento depender delas, diga
   isso e proponha um teste no site de homologação.
-- Mudança de estrutura vira um arquivo novo `database/07_...sql` (o próximo
+- Mudança de estrutura vira um arquivo novo `database/08_...sql` (o próximo
   número livre), para o Julio
   rodar no SQL Editor do Supabase. O arquivo deve: estar entre `begin;` e
   `commit;`, poder ser rodado de novo sem duplicar nada, não conter dados de
@@ -66,7 +66,8 @@ As regras de segurança (arquivos 01, 02 e 03) estão no repositório privado
 | `src/plataforma/colecoes.js` | Prestações (FDA), vouchers, despesas, adiantamentos, PDFs gerados, comprovantes (Storage), downloads; imita a API `window.claude.use('db' / 'assets' / 'downloads' / 'user')` que o sistema antigo usava; fila por documento; recarga a cada 30 s |
 | `src/legacy/sistema.jsx` / `.css` | Sistema antigo adaptado (≈ 360 KB, um arquivo só) |
 | `database/05_ajustes_web.sql` | Ajuste de banco para a versão web (sem dados) |
-| `database/06_comprovantes_removidos.sql` | Visão `comprovante_removido` (comprovantes apagados em cascata, lidos da auditoria); último aplicado |
+| `database/06_comprovantes_removidos.sql` | Visão `comprovante_removido` (comprovantes apagados em cascata, lidos da auditoria) |
+| `database/07_sda.sql` | SDA: colunas `kind` e `parent_fda_id` em `fda`, gatilho `trg_fda_sda` |
 | `testes/` | `npm test`: testes da camada de gravação com banco falso em memória |
 | `.github/workflows/publicar.yml` | Build e publicação no Pages a cada push na `main` |
 
@@ -75,12 +76,23 @@ As regras de segurança (arquivos 01, 02 e 03) estão no repositório privado
 ```
 npm ci
 npm run build      # precisa de VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (valores falsos bastam para compilar)
-npm test           # 16 testes; todos devem passar
+npm test           # 23 testes; todos devem passar
 npm run dev        # local; com .env apontando para a homologação
 ```
 
 Para compilar sem `.env`:
 `VITE_SUPABASE_URL=https://x.supabase.co VITE_SUPABASE_ANON_KEY=k npm run build`
+
+No computador do Julio (Windows, PowerShell, sem Git; Node portátil): copiar
+para fora do OneDrive e compilar lá.
+
+```
+$env:Path = "$env:LOCALAPPDATA\node-portable\node-v20.18.0-win-x64;$env:Path"
+robocopy "<pasta do projeto no OneDrive>" "$env:USERPROFILE\pdx-build" /MIR /XD node_modules dist
+cd "$env:USERPROFILE\pdx-build"; npm ci   # só na primeira vez ou se o package-lock mudar
+$env:VITE_SUPABASE_URL='https://x.supabase.co'; $env:VITE_SUPABASE_ANON_KEY='k'
+npm run build; npm test
+```
 
 ## Método de trabalho
 

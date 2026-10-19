@@ -173,6 +173,26 @@ body{font-family:var(--font-ui);background:var(--bg);color:var(--fg);font-size:1
 .btn-full{width:100%;padding:14px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
+/* pré-visualização de PDF (montada em src/plataforma/colecoes.js) */
+.pv-ov{position:fixed;inset:0;z-index:1100;background:rgba(10,20,28,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.pv-box{width:min(1100px,100%);height:min(92vh,100%);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden}
+.pv-head{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.pv-title{flex:1;min-width:0;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-acts{display:flex;gap:8px}
+.pv-frame{flex:1;width:100%;border:0;background:var(--surface-3)}
+.link-btn{background:none;border:0;padding:0;font:inherit;color:var(--brand-2);text-decoration:underline;cursor:pointer}
+/* menu ⋯ da coluna Ações */
+.acoes{display:flex;justify-content:center}
+.acoes-btn{width:32px;height:32px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--fg-muted);font-size:1.25rem;line-height:1;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.acoes-btn:hover,.acoes-btn[aria-expanded="true"]{background:var(--surface-3);color:var(--fg);border-color:var(--border)}
+.acoes-btn:focus-visible{outline:2px solid var(--brand-2);outline-offset:2px}
+.acoes-menu{position:fixed;z-index:1000;min-width:170px;padding:6px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:2px}
+.acoes-menu .btn{width:100%;justify-content:flex-start;background:transparent;border-color:transparent;color:var(--fg);font-weight:600;padding:8px 12px;border-radius:7px;filter:none}
+.acoes-menu .btn:hover{background:var(--surface-3);color:var(--fg)}
+.acoes-menu .btn-go{color:var(--ok)}
+.acoes-menu .btn-primary{color:var(--brand-2)}
+.acoes-menu .btn-bad{color:var(--bad)}
+.acoes-menu .btn-bad:hover{background:var(--bad-soft);color:var(--bad)}
 .form-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding-top:18px;margin-top:6px;border-top:1px solid var(--border)}
 
 /* ---------- Seleção ---------- */

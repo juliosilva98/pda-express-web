@@ -11,7 +11,7 @@ function Moldura({ children }) {
   return (
     <div className="login-wrap"><div className="login-card">
       <img src={'data:image/png;base64,' + LOGO_B64} alt="Seatrade" className="login-logo" />
-      <h1>PDA Express</h1>
+      <h1>Gestão de Custeio Seatrade</h1>
       <p className="login-sub">Cotação de custos portuários e prestação de contas</p>
       {children}
     </div></div>

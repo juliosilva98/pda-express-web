@@ -32,7 +32,7 @@ const FDA = [
   ['invoiceDate', 'invoice_date', 'd'], ['roe', 'roe', 'roe'], ['pdaId', 'pda_legacy_id', 't'], ['pdaTerminal', 'pda_terminal', 't'],
 ];
 const FDA_REFS = [['companyId', 'company_id', 'company'], ['shipownerId', 'shipowner_id', 'shipowner'], ['bankAccountId', 'bank_account_id', 'bank']];
-const FDA_ESPECIAIS = new Set(['id', 'status', 'createdAt', 'advances', 'exports', 'closing', 'closedAt', 'history', 'copiedFrom']);
+const FDA_ESPECIAIS = new Set(['id', 'status', 'createdAt', 'advances', 'exports', 'closing', 'closedAt', 'history', 'copiedFrom', 'kind', 'parentFdaId']);
 const FDA_CONHECIDOS = new Set([...FDA.map((f) => f[0]), ...FDA_REFS.map((f) => f[0]), ...FDA_ESPECIAIS]);
 
 function conv(v, t) {
@@ -55,6 +55,9 @@ function linhaFda(doc) {
   for (const [k, c, tipo] of FDA_REFS) if (k in doc) r[c] = mapa[tipo][doc[k]] || null;
   if (!r.company_id) r.company_id = empresaPadraoId();
   if ('copiedFrom' in doc) r.copied_from = doc.copiedFrom || null;
+  // SDA (arquivo 07): só vai ao banco quando o documento traz o campo
+  if ('kind' in doc) r.kind = doc.kind === 'sda' ? 'sda' : 'fda';
+  if ('parentFdaId' in doc) r.parent_fda_id = doc.parentFdaId || null;
   r.extra = extraDe(doc, FDA_CONHECIDOS);
   return r;
 }
@@ -67,6 +70,8 @@ function docFda(f, advs, exps, evs) {
   for (const [k, c, tipo] of FDA_REFS) d[k] = rev[tipo][f[c]] || '';
   d.id = f.id; d.status = f.status; d.createdAt = f.created_at;
   if (f.copied_from) d.copiedFrom = f.copied_from;
+  if (f.kind !== undefined) d.kind = f.kind || 'fda';   // sem o arquivo 07 a coluna não existe
+  if (f.parent_fda_id) d.parentFdaId = f.parent_fda_id;
   const regAdv = (linhasAdv[f.id] = {});
   for (const a of advs) regAdv[a.legacy_id || a.id] = a.id;
   d.advances = advs.map((a) => ({ ...(a.extra || {}), id: a.legacy_id || a.id, label: txt(a.label), date: txt(a.credit_date),
@@ -427,14 +432,48 @@ const assets = {
   delete: async () => {},          // o arquivo fica no histórico; a despesa só deixa de apontar para ele
   list: async () => ({ assets: [], usage: {} }),
 };
-const downloads = {
-  save: async ({ filename, data }) => {
+function baixar(filename, data) {
+  const url = URL.createObjectURL(data);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return { status: 'saved', ok: true };   // o sistema só registra o PDF gerado com status 'saved'
+}
+/* PDFs abrem numa janela de pré-visualização; só vão para o computador (e só
+   contam como gerados, para o fechamento da FDA) se a pessoa clicar em Baixar. */
+function previa(filename, data) {
+  return new Promise((resolve) => {
     const url = URL.createObjectURL(data);
-    const a = document.createElement('a'); a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    return { status: 'saved', ok: true };   // o sistema só registra o PDF gerado com status 'saved'
-  },
+    const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
+    const ov = el('div', 'pv-ov'), caixa = el('div', 'pv-box'), topo = el('div', 'pv-head');
+    const titulo = el('strong', 'pv-title', filename);
+    const botoes = el('div', 'pv-acts');
+    const bBaixar = el('button', 'btn btn-primary btn-sm', 'Baixar');
+    const bFechar = el('button', 'btn btn-line btn-sm', 'Fechar');
+    bBaixar.type = 'button'; bFechar.type = 'button';
+    const quadro = el('iframe', 'pv-frame'); quadro.title = 'Pré-visualização: ' + filename; quadro.src = url;
+    botoes.appendChild(bBaixar); botoes.appendChild(bFechar);
+    topo.appendChild(titulo); topo.appendChild(botoes);
+    caixa.appendChild(topo); caixa.appendChild(quadro); ov.appendChild(caixa);
+    let fim = false;
+    const terminar = (resp) => {
+      if (fim) return; fim = true;
+      document.removeEventListener('keydown', tecla, true);
+      ov.remove(); URL.revokeObjectURL(url);
+      resolve(resp);
+    };
+    const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); terminar({ status: 'cancelled' }); } };
+    bBaixar.onclick = () => terminar(baixar(filename, data));
+    bFechar.onclick = () => terminar({ status: 'cancelled' });
+    ov.onclick = (e) => { if (e.target === ov) terminar({ status: 'cancelled' }); };
+    document.addEventListener('keydown', tecla, true);
+    document.body.appendChild(ov);
+    bBaixar.focus && bBaixar.focus();
+  });
+}
+const downloads = {
+  save: async ({ filename, data }) =>
+    data && data.type === 'application/pdf' ? previa(filename, data) : baixar(filename, data),
 };
 
 export async function carregarColecoes(listaUsuarios) {

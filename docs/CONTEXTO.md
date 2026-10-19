@@ -1,4 +1,4 @@
-# PDA Express — contexto do projeto
+# Gestão de Custeio Seatrade (antigo PDA Express) — contexto do projeto
 
 **Atualizado em:** 19/10/2026
 **Responsável:** Julio
@@ -21,10 +21,19 @@ e anteriores), fora do GitHub.
   (seção 9, itens 6 e 8).
 - Último envio ao GitHub: 19/10/2026 (commit `b9195fd`, "Add files via
   upload").
-- No computador do Julio não há Git nem Node: `npm run build` e `npm test` não
-  rodam aqui (o build roda no GitHub Actions). Os envios são feitos pelo site
-  do GitHub, e a cópia de trabalho fica em
+- No computador do Julio não há Git. Os envios são feitos pelo site do GitHub
+  (Add file › Upload files), e a cópia de trabalho fica em
   `OneDrive - Seatrade\Projeto gestão de Custeio Seatrade\pda-express-web`.
+- Node 20.18.0 **portátil** (zip oficial do nodejs.org, SHA-256 conferido) em
+  `%LOCALAPPDATA%\node-portable\node-v20.18.0-win-x64`. Build e testes rodam
+  numa cópia fora do OneDrive, `%USERPROFILE%\pdx-build` (o OneDrive não deve
+  sincronizar `node_modules`; e `%LOCALAPPDATA%` não serve para o build porque
+  o app do Claude redireciona essa pasta e o Vite falha). Ver "Comandos" no
+  `CLAUDE.md`.
+- **Pacote de mudanças de 19/10 à tarde (não publicado ainda):** nome do
+  sistema → "Gestão de Custeio Seatrade"; menu ⋯ na coluna Ações; pré-
+  visualização dos PDFs; cabeçalho do FDA buscando PDA e navio; SDA
+  (seção 12). Exige rodar o `database/07_sda.sql` antes de usar a SDA.
 - **Produção ainda não existe.** Tudo o que está no ar é homologação.
 - Decisão de 19/10: o trabalho continua **só neste repositório**
   (`pda-express-web`). O repositório privado `pda-express` fica como arquivo
@@ -41,7 +50,7 @@ e anteriores), fora do GitHub.
 | @supabase/supabase-js | 2.45.4 (sessão no navegador, `flowType: 'implicit'`) |
 | pdf-lib | 1.17.1 (geração de PDF no navegador, exposta como `window.PDFLib`) |
 | Node no GitHub Actions | 20 |
-| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 aplicados na homologação |
+| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 aplicados na homologação; 07 (SDA) escrito, ainda não aplicado |
 
 ## 3. Linha do tempo
 
@@ -172,7 +181,7 @@ imita essas duas interfaces e traduz para tabelas:
 
 ## 8. Testes
 
-**Automáticos (`npm test`, 16 testes, banco falso em memória):** adiantamento
+**Automáticos (`npm test`, 23 testes, banco falso em memória):** adiantamento
 (editar sem duplicar, incluir, excluir); despesa de voucher validado alterada
 por operacional; validação recusada sem permissão; voucher manual por perfil;
 despesas do PDA num envio, na ordem, editáveis; renumerar sem regravar
@@ -294,3 +303,25 @@ Não acessível aqui. Contém: sistema antigo (`legacy/`), arquivos de banco
 da carga, regressão do motor de cálculo, testes no navegador — algumas com
 trechos de dados de clientes) e documentação. As cargas `04_carga_homolog.sql`
 e `04b_carga_complemento.sql` ficam fora de qualquer repositório.
+
+## 12. Mudanças de layout e SDA (19/10/2026, pedidas pelo Julio)
+
+Primeira "reforma" depois da mudança de casa — pedida explicitamente. O motor
+de cálculo não foi tocado.
+
+| Pedido | Como ficou | Onde |
+|---|---|---|
+| Nome do sistema | "Gestão de Custeio Seatrade" na aba do navegador, no login e no topo. O repositório e o endereço do site continuam `pda-express-web`. Textos dos e-mails de convite ficam no Supabase (Authentication › Email Templates), fora do código | `index.html`, `Raiz.jsx`, `sistema.jsx` |
+| Coluna Ações | Botão ⋯ que abre os botões num menu suspenso (componente `Acoes`, renderizado no `body`; fecha ao escolher, clicar fora, rolar ou Esc). As 10 tabelas trocaram só a "casca" (`<div className="actions">` → `<Acoes>`); os botões e as regras de quem vê cada um são os mesmos | `sistema.jsx`, `sistema.css` |
+| Pré-visualização dos PDFs | `downloads.save` abre uma janela com o PDF (iframe) e os botões Baixar/Fechar. Só **Baixar** grava no computador e responde `status: 'saved'` — portanto só ele registra a geração da FDA para o fechamento. Fechar/Esc responde `cancelled`. Arquivos que não são PDF (backup JSON) baixam direto. Se a pessoa baixar pelo botão do próprio visualizador do navegador, a geração **não** é registrada | `colecoes.js`, `sistema.css`; 3 testes |
+| Cabeçalho do FDA | Na aba Escala, painel "Preencher a partir de": **Cotação (PDA)** preenche navio, viagem, porto, câmbio, medidas, quantidades e liga o FDA ao PDA (`pdaId`); se a cotação tem armador, também a Fatura e remessa. **Navio cadastrado** preenche nome e medidas e, pelo armador do navio, a Fatura e remessa. O seletor de armador na Fatura e remessa continua. Ligar um FDA manual a um PDA **não** marca a cotação como "já tem FDA" (o botão Gerar FDA continua aparecendo nela) | `sistema.jsx` (`FdaHeaderDialog`, contexto `FontesFdaCtx`) |
+| SDA | Mesma tabela e mesmas telas do FDA, com `kind = 'sda'` e `parent_fda_id`. Criar: **Nova SDA avulsa** (topo da lista) ou **Gerar SDA** no ⋯ de um FDA finalizado — herda só o cabeçalho (`CAMPOS_CABECALHO`); invoice, adiantamentos e vouchers começam vazios. Etiqueta SDA nas listas e no detalhe, link para o FDA de origem, PDF com título "SUPPLEMENTARY DISBURSEMENT ACCOUNT" e arquivo "SDA - …". Banco: `database/07_sda.sql` (colunas, restrições e gatilho `trg_fda_sda`: origem precisa ser FDA finalizado; tipo não muda). O front só envia `kind`/`parent_fda_id` quando o documento tem esses campos, então FDAs continuam funcionando mesmo antes do 07 | `sistema.jsx`, `colecoes.js`, `07_sda.sql`; 4 testes |
+
+**Conferido aqui:** `npm run build` e `npm test` (23 testes). **Não
+conferido:** aparência e cliques no site (precisa de login) e o `07_sda.sql`
+num PostgreSQL real — roteiro de teste na homologação depois de rodar o 07 e
+publicar.
+
+**Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
+mesmas do FDA: `fda_editar` etc.); se a SDA deve aparecer numa aba própria;
+numeração própria de invoice para SDA.

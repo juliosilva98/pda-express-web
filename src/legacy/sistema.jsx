@@ -136,6 +136,8 @@ async function embedLogoFor(doc,companyId){
   catch(e){ return null; }
 }
 const OwnersCtx=React.createContext([]);
+/* cotações e navios cadastrados, para o cabeçalho do FDA buscar os dados */
+const FontesFdaCtx=React.createContext({quotations:[],vessels:[]});
 const bankOf=(co,id)=>{
   const list=(co&&co.bankAccounts)||[];
   return list.find(b=>b.id===id)||list.find(b=>b.isDefault)||list[0]||null;
@@ -536,6 +538,48 @@ return ReactDOM.createPortal(
 </div>,document.body);
 }
 
+/* Coluna "Ações" das tabelas: botão ⋯ que abre os botões num menu suspenso.
+   O menu é renderizado no body (não é cortado pela rolagem da tabela) e fecha
+   ao escolher uma opção, clicar fora, rolar a página ou apertar Esc. */
+function Acoes({children}){
+const [pos,setPos]=useState(null);
+const btnRef=useRef(null);
+useEffect(()=>{
+  if(!pos)return;
+  const fechar=()=>setPos(null);
+  const esc=e=>{ if(e.key==='Escape')setPos(null); };
+  window.addEventListener('click',fechar);
+  window.addEventListener('scroll',fechar,true);
+  window.addEventListener('resize',fechar);
+  window.addEventListener('keydown',esc);
+  return()=>{
+    window.removeEventListener('click',fechar);
+    window.removeEventListener('scroll',fechar,true);
+    window.removeEventListener('resize',fechar);
+    window.removeEventListener('keydown',esc);
+  };
+},[pos]);
+const itens=React.Children.toArray(children);
+if(!itens.length)return null;
+const abrir=e=>{
+  e.stopPropagation();
+  if(pos)return setPos(null);
+  const r=btnRef.current.getBoundingClientRect();
+  const alto=itens.length*40+12;
+  const right=Math.max(8,window.innerWidth-r.right);
+  setPos(r.bottom+alto>window.innerHeight&&r.top>alto
+    ?{bottom:window.innerHeight-r.top+4,right}
+    :{top:r.bottom+4,right});
+};
+return(
+<div className="acoes">
+<button ref={btnRef} type="button" className="acoes-btn" aria-label="Ações" aria-haspopup="menu"
+  aria-expanded={!!pos} onClick={abrir}>⋯</button>
+{pos&&ReactDOM.createPortal(
+<div className="acoes-menu" role="menu" style={pos} onClick={()=>setPos(null)}>{itens}</div>,document.body)}
+</div>);
+}
+
 const parseNum=v=>{
   if(typeof v==='number')return isFinite(v)?v:0;
   let t=String(v==null?'':v).trim().replace(/[^\d.,-]/g,'');
@@ -740,9 +784,9 @@ return(
 <thead><tr>{columns.map(c=><th key={c.h} className={c.cls||''}>{c.h}</th>)}<th className="ta-c" style={{width:150}}>Ações</th></tr></thead>
 <tbody>{items.map((it,i)=>(
 <tr key={it.id||i}>{columns.map(c=><td key={c.h} className={c.cls||''}>{c.r(it)}</td>)}
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button type="button" className="btn btn-line btn-sm" onClick={()=>setEdit({item:it,index:i})}>Editar</button>
-<button type="button" className="btn btn-bad btn-sm" onClick={()=>del(i)}>Remover</button></div></td></tr>))}
+<button type="button" className="btn btn-bad btn-sm" onClick={()=>del(i)}>Remover</button></Acoes></td></tr>))}
 </tbody></table></div>}
 <button type="button" className="btn btn-line btn-sm" style={{marginTop:10}}
   onClick={()=>setEdit({item:newItem(),index:-1})}>{addLabel||'Adicionar'}</button>
@@ -915,10 +959,10 @@ return(
 <td className="ta-c num">{(shipowners||[]).filter(o=>(o.companyId||companyOf(companies,'').id)===c.id).length}</td>
 <td>{c.isDefault?<span className="chip chip-ok">Padrão</span>
   :<button className="btn btn-line btn-sm" onClick={()=>makeDefault(c)}>Tornar padrão</button>}</td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>{setE(c);setSh(true)}}>Editar</button>
 <button className="btn btn-bad btn-sm" onClick={()=>del(c)}>Excluir</button>
-</div></td></tr>);})}</tbody></table></div>
+</Acoes></td></tr>);})}</tbody></table></div>
 {sh&&<CompanyDialog company={e} onSave={save} onClose={()=>{setSh(false);setE(null)}}/>}
 </div>);
 }
@@ -1296,9 +1340,9 @@ return(
 <td style={{fontSize:'.8rem',color:'var(--fg-muted)'}}>{modelName((t.wharfage_config||{}).model)}</td>
 <td><VigChip o={t.wharfage_config}/></td>
 <td className="ta-c num">{(t.additional_costs||[]).length}</td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>{setETerm(t);setSTerm(true)}}>Editar</button>
-<button className="btn btn-bad btn-sm" onClick={()=>delTerm(t)}>Excluir</button></div></td></tr>))}</tbody></table></div>}
+<button className="btn btn-bad btn-sm" onClick={()=>delTerm(t)}>Excluir</button></Acoes></td></tr>))}</tbody></table></div>}
 </>}
 
 {sub==='fornecedores'&&<>
@@ -1318,9 +1362,9 @@ Na cotação aparecem como opcionais, com o valor do cadastro já preenchido.</p
 <td className="ta-r num">{x.currency} {fBRLplain(x.default_rate)}</td>
 <td className="num" style={{fontSize:'.8rem'}}>{x.rate_from?fDateBR(x.rate_from):<span className="chip chip-warn">Sem data</span>}</td>
 <td>{x.has_contract?<span className="chip chip-ok">Direto</span>:<span style={{color:'var(--fg-muted)'}}>—</span>}</td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>{setESup(x);setSSup(true)}}>Editar</button>
-<button className="btn btn-bad btn-sm" onClick={()=>delSup(x)}>{outros.length?'Remover':'Excluir'}</button></div></td></tr>);})}
+<button className="btn btn-bad btn-sm" onClick={()=>delSup(x)}>{outros.length?'Remover':'Excluir'}</button></Acoes></td></tr>);})}
 </tbody></table></div>}
 </>}
 
@@ -2284,7 +2328,7 @@ return(<tr key={q.id}>
 {q.fdaId&&<div style={{marginTop:4}}><span className="chip chip-info">FDA aberta</span></div>}</td>
 <td className="ta-r"><span className="num" style={{fontWeight:700}}>{fUSD(best.totalUSD)}</span>
 <div style={{fontSize:'.74rem',color:'var(--fg-muted)'}}>{best.terminal}</div></td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>setOpen(q)}>Abrir</button>
 {q.status!=='approved'&&R.can('cotar')&&<button className="btn btn-line btn-sm" onClick={()=>onEdit(q)}>Editar</button>}
 {R.can('aprovar')&&(q.status==='approved'
@@ -2292,7 +2336,7 @@ return(<tr key={q.id}>
    <button className="btn btn-line btn-sm" onClick={()=>setStatus(q,'draft')}>Reabrir</button></>
  :<button className="btn btn-primary btn-sm" onClick={()=>setStatus(q,'approved')}>Aprovar</button>)}
 {R.can('cotar')&&<button className="btn btn-bad btn-sm" onClick={()=>del(q)}>Excluir</button>}
-</div></td></tr>);})}</tbody></table></div>}
+</Acoes></td></tr>);})}</tbody></table></div>}
 
 {toFda&&<ToFdaDialog quote={toFda} onClose={()=>setToFda(null)}
   onConfirm={tn=>{setToFda(null);onOpenFda(toFda,tn);}}/>}
@@ -2388,10 +2432,10 @@ return(
 <td className="ta-r num">{x.beam||'—'}</td>
 <td className="ta-r num">{fN(x.grossTonnage)}</td>
 <td className="ta-r num">{fN(x.deadWeight)}</td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>{setE(x);setS(true)}}>Editar</button>
 <button className="btn btn-bad btn-sm" onClick={()=>del(x)}>Excluir</button>
-</div></td></tr>))}</tbody></table></div>}
+</Acoes></td></tr>))}</tbody></table></div>}
 {s&&<VesselDialog vessel={e} shipowners={shipowners} onSave={save} onClose={()=>{setS(false);setE(null)}}/>}
 </div>);
 }
@@ -2490,10 +2534,10 @@ return(
 <td className="ta-r num">{fUSD(s2.psp_fee)}</td>
 <td className="ta-r num">{fUSD(s2.communication_fee)}</td>
 <td className="ta-r num">{fUSD(s2.car_hire_fee)}</td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>{setE(s2);setS(true)}}>Editar</button>
 <button className="btn btn-bad btn-sm" onClick={()=>del(s2)}>Excluir</button>
-</div></td></tr>))}</tbody></table></div>}
+</Acoes></td></tr>))}</tbody></table></div>}
 {s&&<OwnerDialog shipowner={e} terminals={terminals} ports={ports} companies={companies} onSave={save} onClose={()=>{setS(false);setE(null)}}/>}
 </div>);
 }
@@ -2880,14 +2924,31 @@ if(fdas===null)return <div className="card"><Empty title="Carregando prestaçõe
 if(openId){
   const f=fdas.find(x=>x.id===openId);
   if(!f){setOpenId(null);return null;}
-  return <FdaDetail fda={f} caps={caps} onBack={()=>setOpenId(null)}/>;
+  const pai=f.parentFdaId?fdas.find(x=>x.id===f.parentFdaId):null;
+  return <FdaDetail key={f.id} fda={f} pai={pai} caps={caps} onBack={()=>setOpenId(null)} onOpen={setOpenId}/>;
 }
 
 const create=async d=>{
   const ref=await caps.db.collection('fdas').add(d);
   setCreating(false); setOpenId(ref.id);
-  toast('Prestação criada','ok');
+  toast(isSda(d)?'SDA criada':'Prestação criada','ok');
 };
+/* SDA a partir de um FDA finalizado: herda só o cabeçalho; invoice, adiantamentos e vouchers começam vazios */
+const gerarSda=f=>{
+  if(!isClosed(f))return toast('A SDA só pode partir de um FDA finalizado','bad');
+  setCreating({...cabecalhoDe(f),kind:'sda',parentFdaId:f.id});
+};
+const origemDe=f=>{
+  if(isSda(f)){
+    const p=f.parentFdaId&&fdas.find(x=>x.id===f.parentFdaId);
+    return f.parentFdaId
+      ?<span className="chip chip-info">Do FDA {p?(p.vessel||'')+(p.voyage?' '+p.voyage:''):'#'+String(f.parentFdaId).slice(-6)}</span>
+      :<span className="chip chip-mute">SDA avulsa</span>;
+  }
+  return f.pdaId?<span className="chip chip-info">PDA #{String(f.pdaId).slice(-6)}{f.pdaTerminal?' · '+f.pdaTerminal:''}</span>
+    :<span className="chip chip-mute">Avulsa</span>;
+};
+const chipSda=f=>isSda(f)&&<span className="chip chip-warn" style={{marginRight:6}}>SDA</span>;
 
 const duplicate=async f=>{
   const ok=await ask({title:'Duplicar prestação',confirmLabel:'Duplicar',
@@ -2919,8 +2980,10 @@ const duplicate=async f=>{
 return(
 <div className="card">
 <div className="card-head"><div><h2>Prestações de contas</h2>
-<div className="sub">Final Disbursement Account por escala</div></div>
-{R.can('fda_editar')&&<button className="btn btn-primary btn-sm" onClick={()=>setCreating(true)}>Nova FDA</button>}</div>
+<div className="sub">Final Disbursement Account (FDA) e Supplementary Disbursement Account (SDA) por escala</div></div>
+{R.can('fda_editar')&&<div className="actions">
+<button className="btn btn-line btn-sm" onClick={()=>setCreating({kind:'sda'})}>Nova SDA avulsa</button>
+<button className="btn btn-primary btn-sm" onClick={()=>setCreating(true)}>Nova FDA</button></div>}</div>
 
 {(()=>{
 const normF=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
@@ -2950,11 +3013,10 @@ const vs=vOf(f.id), ck=allV?fdaChecklist(f,vs):null;
 const it=k=>ck&&ck.items.find(i=>i.k===k);
 return(
 <tr key={f.id} className={ck&&ck.ready?'row-ready':''}>
-<td style={{fontWeight:600}}>{f.vessel||'—'}{ck&&ck.ready&&<div style={{marginTop:4}}><span className="chip chip-info">Pronta para finalizar</span></div>}</td>
+<td style={{fontWeight:600}}>{chipSda(f)}{f.vessel||'—'}{ck&&ck.ready&&<div style={{marginTop:4}}><span className="chip chip-info">Pronta para finalizar</span></div>}</td>
 <td className="num">{f.voyage||'—'}</td>
 <td>{f.port||'—'}</td>
-<td>{f.pdaId?<span className="chip chip-info">PDA #{String(f.pdaId).slice(-6)}{f.pdaTerminal?' · '+f.pdaTerminal:''}</span>
-  :<span className="chip chip-mute">Avulsa</span>}</td>
+<td>{origemDe(f)}</td>
 <td>{ck?<div className="prog">
 <span><b>{vs.length-ck.pend}/{vs.length}</b> vouchers validados</span>
 <span><b>{ck.nDocs}/{ck.nExps}</b> comprovantes</span>
@@ -2962,10 +3024,10 @@ return(
 </div>:<span style={{fontSize:'.76rem',color:'var(--fg-muted)'}}>…</span>}</td>
 <td className="ta-r num">{ck?fUSD(ck.tot.usd):'—'}</td>
 <td className="ta-r num" style={{fontSize:'.8rem'}}>{f.createdAt?new Date(f.createdAt).toLocaleDateString('pt-BR'):'—'}</td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>setOpenId(f.id)}>Abrir</button>
 <button className="btn btn-line btn-sm" onClick={()=>duplicate(f)}>Duplicar</button>
-</div></td></tr>);})}</tbody></table></div>
+</Acoes></td></tr>);})}</tbody></table></div>
  :<div className="tscroll"><table>
 <thead><tr><th>Navio</th><th>Viagem</th><th>Porto</th><th>Invoice</th><th>Finalizada</th><th className="ta-r">Despesas</th><th className="ta-r">Saldo</th><th className="ta-c">Ações</th></tr></thead>
 <tbody>{lista.map(f=>{
@@ -2973,7 +3035,8 @@ const c=f.closing||{};
 const zero=Math.abs(c.saldoBrl||0)<0.005;
 return(
 <tr key={f.id} className="row-closed">
-<td style={{fontWeight:600}}>{f.vessel||'—'}<div style={{marginTop:4}}><span className="chip chip-ok">Finalizada</span></div></td>
+<td style={{fontWeight:600}}>{chipSda(f)}{f.vessel||'—'}<div style={{marginTop:4}}><span className="chip chip-ok">Finalizada</span>
+{isSda(f)&&f.parentFdaId&&<span style={{marginLeft:6}}>{origemDe(f)}</span>}</div></td>
 <td className="num">{f.voyage||'—'}</td>
 <td>{f.port||'—'}</td>
 <td className="num">{f.invoiceNo||'—'}</td>
@@ -2981,18 +3044,21 @@ return(
 <td className="ta-r num">{fUSD(c.totalUsd)}</td>
 <td className="ta-r"><span className="num" style={{fontWeight:700}}>{fUSD(Math.abs(c.saldoUsd||0))}</span>
 <div style={{fontSize:'.72rem',color:zero?'var(--ok)':c.saldoUsd>0?'var(--warn)':'var(--bad)'}}>{zero?'Conciliado':c.saldoUsd>0?'A receber':'A devolver'}</div></td>
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>setOpenId(f.id)}>Abrir</button>
+{R.can('fda_editar')&&!isSda(f)&&<button className="btn btn-go btn-sm" onClick={()=>gerarSda(f)}>Gerar SDA</button>}
 <button className="btn btn-line btn-sm" onClick={()=>duplicate(f)}>Duplicar</button>
-</div></td></tr>);})}</tbody></table></div>}
+</Acoes></td></tr>);})}</tbody></table></div>}
 </>);})()}
 
-{creating&&<FdaHeaderDialog fda={null} onSave={create} onClose={()=>setCreating(false)}/>}
+{creating&&<FdaHeaderDialog fda={null} inicial={creating===true?null:creating}
+  pai={creating!==true&&creating.parentFdaId?fdas.find(x=>x.id===creating.parentFdaId):null}
+  onSave={create} onClose={()=>setCreating(false)}/>}
 </div>);
 }
 
 /* ---------- Detalhe de uma FDA ---------- */
-function FdaDetail({fda,caps,onBack}){
+function FdaDetail({fda,pai,caps,onBack,onOpen}){
 const R=useRole();
 const [tab,setTab]=useState('vouchers');
 const [vouchers,setVouchers]=useState(null);
@@ -3078,8 +3144,13 @@ return(
 <div className="card-head">
 <div>
 <button className="btn btn-line btn-sm" style={{marginBottom:10}} onClick={onBack}>← Prestações</button>
-<h2>{fda.vessel||'Navio sem nome'} · {fda.voyage||'—'}</h2>
-<div className="sub">{fda.port||'Porto não informado'} · ROE {fda.roe} · Invoice {fda.invoiceNo||'—'}</div>
+<h2>{isSda(fda)&&<span className="chip chip-warn" style={{marginRight:8,verticalAlign:'middle'}}>SDA</span>}{fda.vessel||'Navio sem nome'} · {fda.voyage||'—'}</h2>
+<div className="sub">{fda.port||'Porto não informado'} · ROE {fda.roe} · Invoice {fda.invoiceNo||'—'}
+{isSda(fda)&&(fda.parentFdaId
+  ?<> · complementar ao FDA {pai
+    ?<button type="button" className="link-btn" onClick={()=>onOpen&&onOpen(pai.id)}>{pai.vessel||'—'}{pai.voyage?' '+pai.voyage:''}</button>
+    :'#'+String(fda.parentFdaId).slice(-6)}</>
+  :' · SDA avulsa')}</div>
 </div>
 {!locked&&<button className="btn btn-line btn-sm" onClick={()=>setEditHdr(true)}>Editar cabeçalho</button>}
 </div>
@@ -3151,13 +3222,13 @@ return(<tr key={v.id}>
 <td className="ta-r num">{fBRL(t.brl)}</td>
 <td className="ta-r num" style={{fontWeight:600}}>{fUSD(t.usd)}</td>
 {temEstimado&&<td className="ta-r num">{varCell(v,t)}</td>}
-<td><div className="actions" style={{justifyContent:'center'}}>
+<td><Acoes>
 <button className="btn btn-line btn-sm" onClick={()=>setOpenVoucher(v.id)}>Abrir</button>
 {!locked&&R.can('fda_validar')&&(isVal(v)
  ?<button className="btn btn-line btn-sm" onClick={()=>setVoucherStatus(v,'pending')}>Reabrir</button>
  :<button className="btn btn-go btn-sm" onClick={()=>setVoucherStatus(v,'validated')}>Validar</button>)}
 {!locked&&<button className="btn btn-bad btn-sm" onClick={()=>removeVoucher(v)}>Remover</button>}
-</div></td></tr>);})}
+</Acoes></td></tr>);})}
 <tr><td colSpan="6" style={{fontWeight:700,textTransform:'uppercase',fontSize:'.74rem',letterSpacing:'.06em',color:'var(--fg-muted)'}}>Total dos vouchers</td>
 {temEstimado&&<td className="ta-r num" style={{fontWeight:700,color:'var(--fg-muted)'}}>{fUSD(estTotal)}</td>}
 <td className="ta-r num" style={{fontWeight:700}}>{fBRL(totals.brl)}</td>
@@ -3194,6 +3265,14 @@ const fdaFingerprint=(fda,vouchers)=>{
   return (h>>>0).toString(36);
 };
 const isClosed=f=>!!f&&f.status==='closed';
+/* SDA: prestação de contas suplementar, depois do FDA finalizado (a partir de um FDA ou avulsa).
+   Por dentro é igual ao FDA; muda a sigla, o título dos PDFs e a origem. */
+const isSda=f=>!!f&&f.kind==='sda';
+const siglaDe=f=>isSda(f)?'SDA':'FDA';
+const CAMPOS_CABECALHO=['companyId','to','clientAddress','shipownerId','agent','agentAddress','remitTo','bank','account',
+  'swift','bankAccountId','currency','vessel','voyage','port','arrivedFrom','arrivedAt','sailedTo','sailedAt',
+  'grt','dwt','loa','beam','draft','loadedQty','dischargeQty','roe'];
+const cabecalhoDe=f=>Object.fromEntries(CAMPOS_CABECALHO.filter(k=>f[k]!==undefined).map(k=>[k,f[k]]));
 const fDT=iso=>iso?new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
 /* Condições para finalizar uma prestação de contas */
 function fdaChecklist(fda,vouchers){
@@ -3217,7 +3296,7 @@ function fdaChecklist(fda,vouchers){
      d:exps.length===0?'Nenhuma despesa com valor lançada':semDoc.length?`${semDoc.length} de ${exps.length} despesa(s) sem documento`:`${nDocs} comprovante(s) anexado(s)`},
     {k:'invoice',ok:!!(fda.invoiceNo&&fda.invoiceDate),block:true,t:'Invoice com número e data',go:'hdr',
      d:fda.invoiceNo?(fda.invoiceDate?`Invoice ${fda.invoiceNo} · ${fda.invoiceDate}`:`Invoice ${fda.invoiceNo} sem data`):'Informe em Editar cabeçalho › Fatura e remessa'},
-    {k:'pdf',ok:expOk,block:true,t:need==='docs'?'FDA + comprovantes gerada na versão atual':'FDA em PDF gerada na versão atual',go:'main',
+    {k:'pdf',ok:expOk,block:true,t:need==='docs'?siglaDe(fda)+' + comprovantes gerada na versão atual':siglaDe(fda)+' em PDF gerada na versão atual',go:'main',
      d:expOk?`Gerada em ${fDT(exp.at)}${exp.byName?' por '+exp.byName:''}`:exp?'Houve alteração depois da última geração — gere de novo na Main Cover':'Ainda não gerada — use o botão na Main Cover'},
     {k:'remit',ok:remOk,block:false,t:'Dados de remessa preenchidos',go:'hdr',
      d:remOk?'Favorecido, banco e conta informados':'Recomendado — sem eles o armador não tem para onde pagar'}
@@ -3888,10 +3967,11 @@ histórico interno.
 }
 
 /* ---------- Diálogo: cabeçalho da FDA ---------- */
-function FdaHeaderDialog({fda,onSave,onClose}){
+function FdaHeaderDialog({fda,inicial,pai,onSave,onClose}){
 const companies=React.useContext(CompaniesCtx);
 const shipowners=React.useContext(OwnersCtx)||[];
-const [f,setF]=useState(()=>fda?JSON.parse(JSON.stringify(fda)):BLANK_FDA(companyOf(companies,'')));
+const [f,setF]=useState(()=>fda?JSON.parse(JSON.stringify(fda))
+  :{...BLANK_FDA(companyOf(companies,(inicial||{}).companyId||'')),...(inicial||{})});
 const company=companyOf(companies,f.companyId);
 const [sec,setSec]=useState('vessel');
 const s=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -3908,12 +3988,56 @@ const pickCompany=id=>{
   const co=companyOf(companies,id);
   setF(p=>({...p,companyId:co.id,...remitFrom(co,'')}));
 };
+/* cotação (PDA) ou navio cadastrado preenchem a escala; se houver armador, também a fatura e remessa */
+const fontes=React.useContext(FontesFdaCtx)||{};
+const pdas=(fontes.quotations||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+const navios=fontes.vessels||[];
+const dadosArmador=(so,companyId)=>{
+  const co=companyOf(companies,companyId||so.companyId);
+  return{...clientFrom(so),...remitFrom(co,ownerBankFor(so,co)),companyId:co.id};
+};
+const portoDe=q=>(q.port&&(q.port.city+(q.port.state?'/'+q.port.state:'')))||'';
+const pickPda=id=>{
+  const q=pdas.find(x=>x.id===id);
+  if(!q)return;
+  const v=q.vessel||{};
+  const terms=Object.keys(q.terminalResults||{});
+  const so=shipowners.find(x=>x.id===(q.shipowner||{}).id)||null;
+  const op=v.operation;
+  setF(p=>({...p,
+    vessel:v.name||p.vessel, voyage:v.voy||p.voyage, port:portoDe(q)||p.port,
+    roe:Number(v.exchangeRate)||p.roe,
+    loa:Number(v.loa)||p.loa, beam:Number(v.beam)||p.beam,
+    grt:Number(v.grossTonnage)||p.grt, dwt:Number(v.deadWeight)||p.dwt,
+    loadedQty:op==='load'||op==='both'?(v.quantity||p.loadedQty):p.loadedQty,
+    dischargeQty:op==='discharge'||op==='both'?(v.quantity||p.dischargeQty):p.dischargeQty,
+    pdaId:q.id, pdaTerminal:terms.length===1?terms[0]:(p.pdaTerminal||''),
+    ...(so?dadosArmador(so,v.companyId||so.companyId||(q.port||{}).companyId):{})
+  }));
+  toast(`Dados da cotação #${q.id.slice(-6)} aplicados`+(so?' · fatura e remessa de '+so.name:''),'ok');
+};
+const pickNavio=id=>{
+  const v=navios.find(x=>x.id===id);
+  if(!v)return;
+  const so=shipowners.find(x=>x.id===v.shipownerId)||null;
+  setF(p=>({...p,vessel:v.name||p.vessel,
+    loa:Number(v.loa)||p.loa, beam:Number(v.beam)||p.beam,
+    grt:Number(v.grossTonnage)||p.grt, dwt:Number(v.deadWeight)||p.dwt,
+    ...(so?dadosArmador(so,so.companyId):{})
+  }));
+  toast(`Dados do navio ${v.name} aplicados`+(so?' · fatura e remessa de '+so.name:''),'ok');
+};
 const ownerSel=shipowners.find(x=>x.id===f.shipownerId);
 const semEndereco=ownerSel&&!ownerSel.billingAddress;
 const adv=f.advances||[];
 return(
-<Dialog title={fda?'Editar cabeçalho':'Nova prestação de contas'}
+<Dialog title={fda?'Editar cabeçalho':isSda(f)?'Nova SDA':'Nova prestação de contas'}
   sub="Dados que aparecem na Main Cover e em cada voucher" onClose={onClose}>
+{!fda&&isSda(f)&&<div className="note note-info">
+{pai?<>SDA complementar ao FDA <strong>{pai.vessel||'—'}{pai.voyage?' · '+pai.voyage:''}</strong>{pai.invoiceNo?' (invoice '+pai.invoiceNo+')':''}.
+  O cabeçalho veio do FDA; informe o número e a data da invoice da SDA.</>
+  :<>SDA avulsa: prestação suplementar sem FDA de origem.</>}
+</div>}
 <form onSubmit={e=>{e.preventDefault(); if(!f.vessel.trim())return toast('Informe o navio','bad'); onSave(f);}}>
 <div className="subnav">
 {[['vessel','Escala'],['invoice','Fatura e remessa']].map(([k,l])=>(
@@ -3921,6 +4045,22 @@ return(
 </div>
 
 {sec==='vessel'&&<>
+{(pdas.length>0||navios.length>0)&&<div className="panel">
+<div className="panel-head"><h3>Preencher a partir de</h3></div>
+<div className="grid">
+{pdas.length>0&&<div className="field" style={{marginBottom:0}}><label>Cotação (PDA)</label>
+<select value={pdas.some(q=>q.id===f.pdaId)?f.pdaId:''} onChange={e=>pickPda(e.target.value)}>
+<option value="">— escolher cotação —</option>
+{pdas.map(q=>{const v=q.vessel||{};return(
+<option key={q.id} value={q.id}>#{q.id.slice(-6)} · {v.name||'sem navio'}{v.voy?' '+v.voy:''}{portoDe(q)?' · '+portoDe(q):''}{q.status==='approved'?' · aprovada':''}</option>);})}
+</select>
+<span className="hint">Navio, viagem, porto, câmbio e medidas; com armador na cotação, também a fatura e remessa</span></div>}
+{navios.length>0&&<div className="field" style={{marginBottom:0}}><label>Navio cadastrado</label>
+<select value="" onChange={e=>pickNavio(e.target.value)}>
+<option value="">— escolher navio —</option>
+{navios.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
+<span className="hint">Nome e medidas do navio; a fatura e remessa vêm do armador dele</span></div>}
+</div></div>}
 <div className="grid">
 <div className="field"><label>Navio *</label><input value={f.vessel} onChange={e=>s('vessel',e.target.value)} placeholder="Ex: NAVIO EXEMPLO"/></div>
 <div className="field"><label>Viagem</label><input value={f.voyage} onChange={e=>s('voyage',e.target.value)} placeholder="Ex: 2509"/></div>
@@ -4205,7 +4345,7 @@ async function buildFdaPdf({fda,vouchers,rows,subBrl,subUsd,advBrl,advUsd,dueBrl
   const K=await pdfDoc(true,fda.companyId); const {doc,font,bold,rgb}=K;
   const W=A4[0];
   let page=doc.addPage(A4);
-  let y=header(page,K,fda,'FINAL DISBURSEMENT ACCOUNT',
+  let y=header(page,K,fda,isSda(fda)?'SUPPLEMENTARY DISBURSEMENT ACCOUNT':'FINAL DISBURSEMENT ACCOUNT',
     (fda.to?'Para: '+fda.to+' · ':'')+'Invoice '+(fda.invoiceNo||'—'));
 
   /* cliente */
@@ -4287,10 +4427,10 @@ async function buildFdaPdf({fda,vouchers,rows,subBrl,subUsd,advBrl,advUsd,dueBrl
   }
 
   const bytes=await doc.save();
-  const name=`FDA - ${(fda.vessel||'navio').replace(/[^\w\s-]/g,'')} ${fda.voyage||''} - ${fda.port||''}.pdf`.replace(/\s+/g,' ').trim();
+  const name=`${siglaDe(fda)} - ${(fda.vessel||'navio').replace(/[^\w\s-]/g,'')} ${fda.voyage||''} - ${fda.port||''}.pdf`.replace(/\s+/g,' ').trim();
   const out=await caps.downloads.save({filename:name,data:new Blob([bytes],{type:'application/pdf'})});
   if(out&&out.status==='saved')
-    toast(`FDA gerada com ${ordered.length} voucher(s)`+(withDocs?` e ${docsOk} comprovante(s)`:'')+(docsFail?` · ${docsFail} falharam`:''),'ok');
+    toast(`${siglaDe(fda)} gerada com ${ordered.length} voucher(s)`+(withDocs?` e ${docsOk} comprovante(s)`:'')+(docsFail?` · ${docsFail} falharam`:''),'ok');
   return !!(out&&out.status==='saved')&&!docsFail;
 }
 
@@ -5122,11 +5262,12 @@ const isDark=theme==='dark'||(!theme&&window.matchMedia&&window.matchMedia('(pre
 
 return(
 <CompaniesCtx.Provider value={companies}><OwnersCtx.Provider value={shipowners}>
+<FontesFdaCtx.Provider value={{quotations,vessels}}>
 <div className="app">
 <header className="masthead">
 <img className="brand" src={'data:image/png;base64,'+LOGO_B64} alt="Seatrade"/>
 <div>
-<h1>PDA Express</h1>
+<h1>Gestão de Custeio Seatrade</h1>
 <p>Cotação de custos portuários e prestação de contas</p>
 </div>
 <div className="who">
@@ -5212,6 +5353,7 @@ return(
 <ConfirmDialog req={req} onAnswer={answer}/>
 <Toasts items={toasts}/>
 </div>
+</FontesFdaCtx.Provider>
 </OwnersCtx.Provider></CompaniesCtx.Provider>);
 }
 
