@@ -274,13 +274,32 @@ administrador).
    entrar, mas o login **não** foi ligado ao cadastro: ela caiu em
    "Solicitações de acesso". Ao clicar em "Liberar como…", o sistema tentava
    **criar outro** `app_user` com o mesmo e-mail e o banco recusou
-   (`app_user_email_key`). Corrigido em `sistema.jsx` (`aprovar`): se já
-   existe cadastro com o mesmo e-mail sem login, liga o login a ele
-   (`auth_id`, perfil, ativo) em vez de inserir; se o cadastro já está ligado
-   a outro login, avisa e não faz nada. **Em aberto:** por que a ligação
-   automática não aconteceu no primeiro login (regra do banco, arquivos 01–03,
-   fora deste repositório) e se o banco permite ao admin gravar `auth_id`
-   — confirmar no site.
+   (`app_user_email_key`). Primeira correção (ligar pelo site, gravando
+   `auth_id`) foi recusada pelo banco: "O vínculo com o login não pode ser
+   alterado pelo sistema" — regra dos arquivos 01–03. Correção final em
+   `sistema.jsx` (`aprovar`): se já existe cadastro com o mesmo e-mail, não
+   tenta inserir nem ligar; mostra um aviso explicando que a ligação é feita
+   no SQL Editor. **Procedimento no SQL Editor** (trocar o e-mail; não gravar
+   em arquivo do repositório, porque tem dado pessoal):
+   ```sql
+   begin;
+   update app_user a set auth_id = u.id, active = true
+     from auth.users u
+    where lower(u.email) = '<email>' and lower(a.email) = lower(u.email)
+      and a.auth_id is null;
+   update access_request
+      set status = 'approved', granted_role = '<perfil>', decided_at = now(),
+          decided_by = (select id from app_user where lower(email) = '<email do admin>')
+    where lower(email) = '<email>' and status = 'pending';
+   commit;
+   ```
+   **Provável causa:** a conta foi criada no Supabase **antes** do cadastro em
+   Usuários (ou entrou antes dele existir); a ligação automática do banco não
+   cobre essa ordem. Ordem certa: cadastrar em Usuários → depois enviar o
+   convite. **Em aberto:** confirmar a causa olhando as regras do banco.
+   Caso de 19/10 resolvido com o procedimento acima. A "senha incorreta" que
+   continuou depois era o navegador preenchendo uma senha antiga salva;
+   digitando à mão, entrou.
 
 ## 10. Pendências e próximos passos
 
@@ -374,6 +393,25 @@ calculado (R$ ÷ ROE) e, se não mudar US$ nem ROE, mantém o R$ original sem
 arredondar. 1 teste novo (24 no total). Publicado em 19/10 (commit
 `30025bd`) e conferido na homologação sem salvar: campo "Valor recebido US$",
 US$ 1.000 × ROE 5,1 → "Convertido: R$ 5.100,00".
+
+**Armador por escala (decisão do Julio, 19/10):** um mesmo navio pode ter
+armadores diferentes em momentos diferentes; o armador pertence à escala.
+- Cadastro do navio: campo virou **"Armador atual (sugestão)"**, opcional;
+  "sem armador" deixou de ser pendência; coluna "Armador atual" na lista.
+  Banco: `database/08_navio_armador_opcional.sql` (tira o `not null` de
+  `vessel.shipowner_id`, se houver).
+- Cotação (PDA): campo **"Armador desta escala \*"** saiu do bloco Navio e
+  foi para o bloco Escala; continua obrigatório para calcular. Escolher o
+  navio só sugere o armador dele se o campo estiver vazio (antes
+  substituía).
+- FDA/SDA: **toda prestação precisa de armador** — o cabeçalho não salva sem
+  "Armador da escala" (leva para a aba Fatura e remessa). "Preencher a partir
+  de › Navio cadastrado" preenche só nome e medidas (antes trazia o armador
+  do navio). Armador que saiu do cadastro aparece como "(fora do cadastro
+  atual)". O FDA gerado do PDA continua trazendo o armador da cotação.
+- Histórico de armadores por navio: não agora (decisão do Julio).
+- Não muda cotações nem prestações já gravadas. Prestações antigas sem
+  armador só pedem a escolha quando o cabeçalho for editado.
 
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
 mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.

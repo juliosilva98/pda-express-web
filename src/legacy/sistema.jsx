@@ -1785,7 +1785,8 @@ useEffect(()=>{
 },[portId]);
 useEffect(()=>{
   if(!sel)return;
-  setV(p=>({...p,name:sel.name,imo:sel.imo||'',flag:sel.flag||'',shipownerId:sel.shipownerId,
+  /* armador é da escala: o do cadastro do navio só entra como sugestão, se ainda não houver um escolhido */
+  setV(p=>({...p,name:sel.name,imo:sel.imo||'',flag:sel.flag||'',shipownerId:p.shipownerId||sel.shipownerId||'',
     loa:sel.loa,beam:sel.beam||0,grossTonnage:sel.grossTonnage,deadWeight:sel.deadWeight,
     vesselType:sel.vesselType||p.vesselType||'bulk',
     navigation:sel.navigation||p.navigation||'longo'}));
@@ -1892,6 +1893,11 @@ return(
 <label>{t.name}<span className={'chip '+(t.type==='public'?'chip-info':'chip-ok')}>{t.type==='public'?'Público':'Privado'}</span></label>
 </div>);})}
 </div>)}
+{port&&<div className="field" style={{marginTop:16,marginBottom:0}}><label>Armador desta escala *</label>
+<select value={v.shipownerId||''} onChange={e=>setV({...v,shipownerId:e.target.value})}>
+<option value="">Selecione...</option>
+{shipowners.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+<span className="hint">O mesmo navio pode ter armadores diferentes em escalas diferentes. Ao escolher o navio, o armador atual dele é sugerido se este campo estiver vazio.</span></div>}
 </div>
 
 {termIds.length>0&&<div className="card">
@@ -1906,10 +1912,6 @@ return(
 <input value={v.name} onChange={e=>setV({...v,name:e.target.value})} placeholder="Ex: MV TBN"/></div>
 <div className="field"><label>Bandeira</label>
 <input value={v.flag||''} onChange={e=>setV({...v,flag:e.target.value})} placeholder="TBI"/></div>
-<div className="field"><label>Armador *</label>
-<select value={v.shipownerId} onChange={e=>setV({...v,shipownerId:e.target.value})}>
-<option value="">Selecione...</option>
-{shipowners.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
 <div className="field"><label>Tipo de navio *</label>
 <select value={v.vesselType||'bulk'} onChange={e=>setV({...v,vesselType:e.target.value})}>
 {Object.entries(VTYPES).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select>
@@ -2418,14 +2420,14 @@ return(
 <button className="btn btn-primary btn-sm" onClick={()=>{setE(null);setS(true)}}>Novo navio</button></div>
 {vessels.length===0?<Empty title="Nenhum navio cadastrado" text="Cadastre os navios recorrentes para não redigitar LOA, GT e DWT a cada cotação."/>:
 <div className="tscroll"><table>
-<thead><tr><th>Navio</th><th>IMO</th><th>Armador</th><th>Tipo</th><th>Navegação</th>
+<thead><tr><th>Navio</th><th>IMO</th><th>Armador atual</th><th>Tipo</th><th>Navegação</th>
 <th className="ta-r">LOA (m)</th><th className="ta-r">Boca</th>
 <th className="ta-r">GT</th><th className="ta-r">DWT</th><th className="ta-c">Ações</th></tr></thead>
 <tbody>{vessels.map(x=>(
 <tr key={x.id}>
 <td style={{fontWeight:600}}>{x.name}{x.flag?<div style={{fontSize:'.74rem',color:'var(--fg-muted)'}}>{x.flag}</div>:null}</td>
 <td className="num" style={{fontSize:'.8rem'}}>{x.imo||'—'}</td>
-<td>{(shipowners.find(s2=>s2.id===x.shipownerId)||{}).name||<span className="chip chip-bad">Sem armador</span>}</td>
+<td>{(shipowners.find(s2=>s2.id===x.shipownerId)||{}).name||<span style={{color:'var(--fg-muted)'}}>—</span>}</td>
 <td><span className="chip chip-mute">{x.vesselType==='container'?'Contêiner':'Granel'}</span></td>
 <td><span className="chip chip-info">{x.navigation==='cabotagem'?'Cabotagem':'Longo curso'}</span></td>
 <td className="ta-r num">{x.loa}</td>
@@ -2446,7 +2448,7 @@ const [f,setF]=useState(vessel||{name:'',imo:'',flag:'',shipownerId:'',vesselTyp
 const set=(k,v)=>setF(p=>({...p,[k]:v}));
 return(
 <Dialog size="sm" title={vessel?'Editar navio':'Novo navio'} onClose={onClose}>
-<form onSubmit={e=>{e.preventDefault(); if(!f.name.trim()||!f.shipownerId)return toast('Preencha nome e armador','bad'); onSave(f);}}>
+<form onSubmit={e=>{e.preventDefault(); if(!f.name.trim())return toast('Preencha o nome do navio','bad'); onSave(f);}}>
 <div className="note note-info">
 Aqui ficam os dados que <strong>não mudam de viagem para viagem</strong>. O que varia a cada
 escala — tipo de carga, mercadoria, quantidade, operação, estadia — é informado na cotação.
@@ -2459,10 +2461,11 @@ escala — tipo de carga, mercadoria, quantidade, operação, estadia — é inf
 <div className="field"><label>Bandeira</label>
 <input value={f.flag||''} onChange={e=>set('flag',e.target.value)} placeholder="Ex: Panamá"/>
 <span className="hint">Sai no cabeçalho do PDA</span></div>
-<div className="field"><label>Armador *</label>
-<select value={f.shipownerId} onChange={e=>set('shipownerId',e.target.value)}>
-<option value="">Selecione...</option>
-{shipowners.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+<div className="field"><label>Armador atual (sugestão)</label>
+<select value={f.shipownerId||''} onChange={e=>set('shipownerId',e.target.value)}>
+<option value="">— nenhum —</option>
+{shipowners.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+<span className="hint">O armador vale por escala e é escolhido na cotação; aqui só agiliza o preenchimento</span></div>
 </div>
 <div className="panel">
 <div className="panel-head"><h3>Classificação</h3></div>
@@ -2504,7 +2507,7 @@ const save=d=>{ setShipowners(e?shipowners.map(x=>x.id===e.id?{...d,id:e.id}:x):
 const del=async x=>{
   const n=vessels.filter(v=>v.shipownerId===x.id).length;
   const ok=await ask({title:'Excluir armador',danger:true,confirmLabel:'Excluir',
-    message:n>0?`${n} navio(s) estão vinculados a ${x.name} e ficarão sem armador.`:`${x.name} será removido do cadastro.`});
+    message:n>0?`${x.name} é o armador sugerido de ${n} navio(s); a sugestão será retirada. Cotações e prestações já feitas não mudam.`:`${x.name} será removido do cadastro.`});
   if(!ok)return; setShipowners(shipowners.filter(y=>y.id!==x.id)); toast('Armador excluído');
 };
 return(
@@ -4038,16 +4041,15 @@ const pickPda=id=>{
   }));
   toast(`Dados da cotação #${q.id.slice(-6)} aplicados`+(so?' · fatura e remessa de '+so.name:''),'ok');
 };
+/* navio cadastrado preenche só nome e medidas: o armador é da escala (PDA) ou escolhido em Fatura e remessa */
 const pickNavio=id=>{
   const v=navios.find(x=>x.id===id);
   if(!v)return;
-  const so=shipowners.find(x=>x.id===v.shipownerId)||null;
   setF(p=>({...p,vessel:v.name||p.vessel,
     loa:Number(v.loa)||p.loa, beam:Number(v.beam)||p.beam,
-    grt:Number(v.grossTonnage)||p.grt, dwt:Number(v.deadWeight)||p.dwt,
-    ...(so?dadosArmador(so,so.companyId):{})
+    grt:Number(v.grossTonnage)||p.grt, dwt:Number(v.deadWeight)||p.dwt
   }));
-  toast(`Dados do navio ${v.name} aplicados`+(so?' · fatura e remessa de '+so.name:''),'ok');
+  toast(`Dados do navio ${v.name} aplicados`+(f.shipownerId?'':' · escolha o armador em Fatura e remessa'),'ok');
 };
 const ownerSel=shipowners.find(x=>x.id===f.shipownerId);
 const semEndereco=ownerSel&&!ownerSel.billingAddress;
@@ -4060,7 +4062,11 @@ return(
   O cabeçalho veio do FDA; informe o número e a data da invoice da SDA.</>
   :<>SDA avulsa: prestação suplementar sem FDA de origem.</>}
 </div>}
-<form onSubmit={e=>{e.preventDefault(); if(!f.vessel.trim())return toast('Informe o navio','bad'); onSave(f);}}>
+<form onSubmit={e=>{e.preventDefault();
+  if(!f.vessel.trim()){setSec('vessel');return toast('Informe o navio','bad');}
+  /* toda prestação (FDA ou SDA) tem armador */
+  if(!f.shipownerId){setSec('invoice');return toast('Escolha o armador da escala em Fatura e remessa','bad');}
+  onSave(f);}}>
 <div className="subnav">
 {[['vessel','Escala'],['invoice','Fatura e remessa']].map(([k,l])=>(
 <button key={k} type="button" className={sec===k?'active':''} onClick={()=>setSec(k)}>{l}</button>))}
@@ -4081,7 +4087,7 @@ return(
 <select value="" onChange={e=>pickNavio(e.target.value)}>
 <option value="">— escolher navio —</option>
 {navios.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
-<span className="hint">Nome e medidas do navio; a fatura e remessa vêm do armador dele</span></div>}
+<span className="hint">Nome e medidas do navio; o armador é o da escala</span></div>}
 </div></div>}
 <div className="grid">
 <div className="field"><label>Navio *</label><input value={f.vessel} onChange={e=>s('vessel',e.target.value)} placeholder="Ex: NAVIO EXEMPLO"/></div>
@@ -4116,9 +4122,10 @@ return(
 <select value={f.companyId||company.id} onChange={e=>pickCompany(e.target.value)}>
 {companies.map(c=><option key={c.id} value={c.id}>{c.tradeName||c.legalName}</option>)}</select>
 <span className="hint">Logo dos documentos e conta de remessa</span></div>}
-<div className="field"><label>Armador cadastrado</label>
+<div className="field"><label>Armador da escala *</label>
 <select value={f.shipownerId||''} onChange={e=>pickOwner(e.target.value)}>
-<option value="">— digitar manualmente —</option>
+<option value="">Selecione...</option>
+{f.shipownerId&&!ownerSel&&<option value={f.shipownerId}>{f.to||'Armador'} (fora do cadastro atual)</option>}
 {shipowners.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select>
 <span className="hint">{semEndereco?'Este armador está sem endereço de faturamento no cadastro'
   :'Preenche cliente, endereço, moeda e conta de remessa'}</span></div>
@@ -4846,7 +4853,7 @@ function pendencias({companies,shipowners,vessels,ports,terminals,suppliers}){
     if(o.companyId&&!(companies||[]).some(c=>c.id===o.companyId))add('owners','bad',`${o.name}: empresa que fatura foi excluída`);
   });
   (vessels||[]).forEach(v=>{
-    if(!v.shipownerId||!(shipowners||[]).some(o=>o.id===v.shipownerId))add('vessels','warn',`${v.name}: sem armador`);
+    /* armador é por escala (cotação); no navio é só sugestão, por isso não gera pendência */
     if(!v.grossTonnage||!v.deadWeight||!v.loa)add('vessels','warn',`${v.name}: LOA, GT ou DWT em branco`);
   });
   (ports||[]).forEach(p=>{
@@ -5099,16 +5106,17 @@ const salvar=async(id,patch,msg)=>{
 const aprovar=async(rq,role)=>{
   setBusy(true);
   const emailRq=(rq.email||'').trim().toLowerCase();
-  /* já cadastrado em Usuários (convite pendente): liga o login ao cadastro existente em vez de criar outro */
+  /* já existe cadastro com este e-mail: criar outro dá erro (e-mail único) e o banco não deixa o
+     sistema gravar o vínculo com o login (auth_id). A ligação é feita no SQL Editor — CONTEXTO.md, seção 9, item 10. */
   const existente=(rows||[]).find(u=>(u.email||'').trim().toLowerCase()===emailRq);
-  if(existente&&existente.auth_id&&existente.auth_id!==rq.external_id){
+  if(existente){
     setBusy(false);
-    return toast(`${existente.name} já está ligado a outro login. Confira o cadastro antes de liberar.`,'bad');
+    return toast(existente.auth_id
+      ?`${existente.name} já está ligado a outro login. Confira o cadastro antes de liberar.`
+      :`${existente.name} já tem cadastro aguardando convite. A ligação com este login precisa ser feita no Supabase (SQL Editor).`,'bad');
   }
-  const nome=existente?existente.name:((rq.name||'').trim()||emailRq.split('@')[0]);
-  const a=existente
-    ?await supabase.from('app_user').update({auth_id:rq.external_id,role,active:true}).eq('id',existente.id)
-    :await supabase.from('app_user').insert({name:nome,email:rq.email,role,auth_id:rq.external_id});
+  const nome=(rq.name||'').trim()||emailRq.split('@')[0];
+  const a=await supabase.from('app_user').insert({name:nome,email:rq.email,role,auth_id:rq.external_id});
   if(a.error){ setBusy(false); return erro(a.error); }
   await supabase.from('access_request').update({status:'approved',granted_role:role,decided_by:meId,decided_at:new Date().toISOString()}).eq('id',rq.id);
   setBusy(false); toast(`Acesso liberado para ${nome} — ${ROLES[role].label}`,'ok'); carregar();
