@@ -951,7 +951,7 @@ return(
 <tr key={c.id}>
 <td>{src?<img src={src} alt="" style={{height:28,maxWidth:64,objectFit:'contain',background:'#fff',borderRadius:4,padding:2}}/>
   :<span className="chip chip-warn">Sem logo</span>}</td>
-<td style={{fontWeight:600}}>{c.tradeName||c.legalName}
+<td style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>{setE(c);setSh(true)}}>{c.tradeName||c.legalName}</button>
 {c.tradeName&&<div style={{fontSize:'.74rem',color:'var(--fg-muted)',fontWeight:400}}>{c.legalName}</div>}</td>
 <td className="num" style={{fontSize:'.8rem'}}>{c.cnpj||'—'}</td>
 <td>{[c.city,c.state].filter(Boolean).join(' / ')||'—'}</td>
@@ -1335,7 +1335,7 @@ return(
 <div className="tscroll"><table>
 <thead><tr><th>Terminal</th><th>Tipo</th><th>Wharfage</th><th>Vigência</th><th className="ta-c">Custos extras</th><th className="ta-c">Ações</th></tr></thead>
 <tbody>{pTerms.map(t=>(
-<tr key={t.id}><td style={{fontWeight:600}}>{t.name}</td>
+<tr key={t.id}><td style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>{setETerm(t);setSTerm(true)}}>{t.name}</button></td>
 <td><span className={'chip '+(t.type==='public'?'chip-info':'chip-ok')}>{t.type==='public'?'Público':'Privado'}</span></td>
 <td style={{fontSize:'.8rem',color:'var(--fg-muted)'}}>{modelName((t.wharfage_config||{}).model)}</td>
 <td><VigChip o={t.wharfage_config}/></td>
@@ -1356,7 +1356,7 @@ Na cotação aparecem como opcionais, com o valor do cadastro já preenchido.</p
 <tbody>{pSups.map(x=>{
   const outros=(x.portIds||[]).filter(id=>id!==port.id).map(id=>(ports.find(p=>p.id===id)||{}).city).filter(Boolean);
   return(
-<tr key={x.id}><td style={{fontWeight:600}}>{x.name}
+<tr key={x.id}><td style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>{setESup(x);setSSup(true)}}>{x.name}</button>
 {outros.length>0&&<div style={{fontSize:'.72rem',color:'var(--fg-muted)',fontWeight:400}}>também em {outros.join(', ')}</div>}</td>
 <td><span className="chip chip-mute">{SERVICES[x.service]||x.service}</span></td>
 <td className="ta-r num">{x.currency} {fBRLplain(x.default_rate)}</td>
@@ -2317,7 +2317,7 @@ const best=vals.reduce((a,b)=>a.totalUSD<b.totalUSD?a:b);
 return(<tr key={q.id}>
 <td className="num">#{q.id.slice(-6)}</td>
 <td className="num" style={{fontSize:'.8rem'}}>{new Date(q.date).toLocaleDateString('pt-BR')}</td>
-<td><div style={{fontWeight:600}}>{q.vessel.name||'—'}</div>
+<td><div style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>setOpen(q)}>{q.vessel.name||'—'}</button></div>
 <div style={{fontSize:'.76rem',color:'var(--fg-muted)'}}>
 {q.vessel.voy?'Voy '+q.vessel.voy:<span className="chip chip-warn">Sem viagem</span>}
 {q.vessel.proformaNo?' · '+q.vessel.proformaNo:''}</div>
@@ -2425,7 +2425,7 @@ return(
 <th className="ta-r">GT</th><th className="ta-r">DWT</th><th className="ta-c">Ações</th></tr></thead>
 <tbody>{vessels.map(x=>(
 <tr key={x.id}>
-<td style={{fontWeight:600}}>{x.name}{x.flag?<div style={{fontSize:'.74rem',color:'var(--fg-muted)'}}>{x.flag}</div>:null}</td>
+<td style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>{setE(x);setS(true)}}>{x.name}</button>{x.flag?<div style={{fontSize:'.74rem',color:'var(--fg-muted)'}}>{x.flag}</div>:null}</td>
 <td className="num" style={{fontSize:'.8rem'}}>{x.imo||'—'}</td>
 <td>{(shipowners.find(s2=>s2.id===x.shipownerId)||{}).name||<span style={{color:'var(--fg-muted)'}}>—</span>}</td>
 <td><span className="chip chip-mute">{x.vesselType==='container'?'Contêiner':'Granel'}</span></td>
@@ -2521,7 +2521,7 @@ return(
 <th className="ta-r">PSP</th><th className="ta-r">Communication</th><th className="ta-r">Car hire</th><th className="ta-c">Ações</th></tr></thead>
 <tbody>{shipowners.map(s2=>(
 <tr key={s2.id}>
-<td style={{fontWeight:600}}>{s2.name}
+<td style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>{setE(s2);setS(true)}}>{s2.name}</button>
 {s2.legalName&&s2.legalName!==s2.name?<div style={{fontSize:'.74rem',color:'var(--fg-muted)',fontWeight:400}}>{s2.legalName}</div>:null}</td>
 <td>{s2.billingAddress
   ?<span className="chip chip-ok">{(s2.country||'Completo')}{s2.invoiceCurrency?' · '+s2.invoiceCurrency:''}</span>
@@ -3028,7 +3028,7 @@ const vs=vOf(f.id), ck=allV?fdaChecklist(f,vs):null;
 const it=k=>ck&&ck.items.find(i=>i.k===k);
 return(
 <tr key={f.id} className={ck&&ck.ready?'row-ready':''}>
-<td style={{fontWeight:600}}>{chipSda(f)}{f.vessel||'—'}{ck&&ck.ready&&<div style={{marginTop:4}}><span className="chip chip-info">Pronta para finalizar</span></div>}</td>
+<td style={{fontWeight:600}}>{chipSda(f)}<button type="button" className="nome-link" onClick={()=>setOpenId(f.id)}>{f.vessel||'—'}</button>{ck&&ck.ready&&<div style={{marginTop:4}}><span className="chip chip-info">Pronta para finalizar</span></div>}</td>
 <td className="num">{f.voyage||'—'}</td>
 <td>{f.port||'—'}</td>
 <td>{origemDe(f)}</td>
@@ -3050,7 +3050,7 @@ const c=f.closing||{};
 const zero=Math.abs(c.saldoBrl||0)<0.005;
 return(
 <tr key={f.id} className="row-closed">
-<td style={{fontWeight:600}}>{chipSda(f)}{f.vessel||'—'}<div style={{marginTop:4}}><span className="chip chip-ok">Finalizada</span>
+<td style={{fontWeight:600}}>{chipSda(f)}<button type="button" className="nome-link" onClick={()=>setOpenId(f.id)}>{f.vessel||'—'}</button><div style={{marginTop:4}}><span className="chip chip-ok">Finalizada</span>
 {isSda(f)&&f.parentFdaId&&<span style={{marginLeft:6}}>{origemDe(f)}</span>}</div></td>
 <td className="num">{f.voyage||'—'}</td>
 <td>{f.port||'—'}</td>
@@ -3224,7 +3224,7 @@ const docs=(v.expenses||[]).filter(e=>e.assetId).length;
 const n=(v.expenses||[]).length;
 return(<tr key={v.id}>
 <td className="ta-c num" style={{fontWeight:700}}>{v.number}</td>
-<td><strong>{v.accountName}</strong>{v.accountRef&&<div className="num" style={{fontSize:'.74rem',color:'var(--fg-muted)'}}>{v.accountRef}</div>}</td>
+<td><strong><button type="button" className="nome-link" onClick={()=>setOpenVoucher(v.id)}>{v.accountName}</button></strong>{v.accountRef&&<div className="num" style={{fontSize:'.74rem',color:'var(--fg-muted)'}}>{v.accountRef}</div>}</td>
 <td style={{fontSize:'.82rem'}}>{(COA[v.group]||{}).label}</td>
 <td>{isVal(v)?<span className="chip chip-ok">Validado</span>
   :<span className="chip chip-warn">A validar</span>}

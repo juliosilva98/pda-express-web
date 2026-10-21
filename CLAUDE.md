@@ -47,7 +47,7 @@ As regras de segurança (arquivos 01, 02 e 03) estão no repositório privado
 
 - Não presuma regras do banco: quando o comportamento depender delas, diga
   isso e proponha um teste no site de homologação.
-- Mudança de estrutura vira um arquivo novo `database/09_...sql` (o próximo
+- Mudança de estrutura vira um arquivo novo `database/10_...sql` (o próximo
   número livre), para o Julio
   rodar no SQL Editor do Supabase. O arquivo deve: estar entre `begin;` e
   `commit;`, poder ser rodado de novo sem duplicar nada, não conter dados de
@@ -69,6 +69,7 @@ As regras de segurança (arquivos 01, 02 e 03) estão no repositório privado
 | `database/06_comprovantes_removidos.sql` | Visão `comprovante_removido` (comprovantes apagados em cascata, lidos da auditoria) |
 | `database/07_sda.sql` | SDA: colunas `kind` e `parent_fda_id` em `fda`, gatilho `trg_fda_sda` |
 | `database/08_navio_armador_opcional.sql` | Armador do navio opcional (o armador é por escala) |
+| `database/09_dupla_validacao_so_operacional.sql` | Segregação na validação de voucher só para quem não é financeiro nem admin (função `fn_voucher_sod`) |
 | `testes/` | `npm test`: testes da camada de gravação com banco falso em memória |
 | `.github/workflows/publicar.yml` | Build e publicação no Pages a cada push na `main` |
 

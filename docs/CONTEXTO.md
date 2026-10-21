@@ -51,7 +51,7 @@ e anteriores), fora do GitHub.
 | @supabase/supabase-js | 2.45.4 (sessão no navegador, `flowType: 'implicit'`) |
 | pdf-lib | 1.17.1 (geração de PDF no navegador, exposta como `window.PDFLib`) |
 | Node no GitHub Actions | 20 |
-| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 → 07 (SDA) aplicados na homologação |
+| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 → 07 (SDA) → 08 (armador do navio opcional) aplicados na homologação; 09 (dupla validação só para operacional, 21/10, conferência true) |
 
 ## 3. Linha do tempo
 
@@ -140,7 +140,12 @@ Regras do banco:
 - RLS em todas as tabelas; sem login, nada.
 - Autoria gravada pelo banco (ninguém lança em nome de outro).
 - **Segregação:** quem lançou despesa num voucher não pode validá-lo
-  (confirmado no site em 19/10).
+  (confirmado no site em 19/10). **Mudança de 21/10 (decisão do Julio,
+  `database/09_dupla_validacao_so_operacional.sql`):** financeiro e
+  administrador podem lançar e validar o próprio voucher; a dupla validação
+  fica só para o que o operacional lança (e ele não tem permissão de
+  validar). Só o trecho da segregação em `fn_voucher_sod` mudou; o resto da
+  função foi copiado da versão em uso (lida com `pg_get_functiondef`).
 - **Despesa alterada reabre o voucher** (gatilho `trg_reopen_expense`).
 - Fechamento da FDA com as mesmas condições do sistema (seção 7).
 - Conta bancária nova ou alterada fica "não conferida"; outra pessoa confere;
@@ -412,6 +417,23 @@ armadores diferentes em momentos diferentes; o armador pertence à escala.
 - Histórico de armadores por navio: não agora (decisão do Julio).
 - Não muda cotações nem prestações já gravadas. Prestações antigas sem
   armador só pedem a escolha quando o cabeçalho for editado.
+- Publicado em 21/10 (commit `a5a5343`) e conferido na homologação sem
+  gravar: cotação com "Armador desta escala \*" no bloco Escala e sem o campo
+  no bloco Navio; escolher navio com o campo vazio sugeriu o armador dele (só
+  há 1 armador ativo, então "manter o já escolhido" foi conferido só no
+  código); cadastro de navio com "Armador atual (sugestão)" e "— nenhum —",
+  sem aviso "Sem armador"; Nova FDA com só o navio preenchido foi recusada
+  ("Escolha o armador da escala…"), abriu a aba Fatura e remessa e não criou
+  nada (13 prestações antes e depois). Banco 08 aplicado na homologação
+  (conferência `is_nullable = YES`, 21/10).
+
+**Nome clicável nas tabelas (pedido do Julio, 21/10):** o nome em negrito
+abre o item, como a primeira opção do ⋯ — PDAs (navio → abre a cotação),
+FDAs e SDAs em elaboração e finalizadas (navio → abre a prestação),
+vouchers (conta → abre o voucher) e, nos cadastros, empresas, terminais,
+fornecedores, navios e armadores (nome → abre a edição). Botão
+`.nome-link` (aparência de texto, sublinha ao passar o mouse). O menu ⋯
+continua igual.
 
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
 mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.
