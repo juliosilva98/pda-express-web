@@ -1876,7 +1876,7 @@ return(
 </div>}
 <div className="card">
 <div className="card-head"><div><h2>Escala</h2>
-<div className="sub">Porto de atracação e terminais a comparar</div></div></div>
+<div className="sub">Porto de atracação, terminais a comparar e armador desta escala</div></div></div>
 <Auto label="Porto" required items={ports} value={portId} onChange={setPortId}
   placeholder="Digite a cidade ou o nome do porto" getText={p=>`${p.city}, ${p.state}`}
   renderItem={p=><><strong>{p.city}, {p.state}</strong><div className="meta">{p.name}</div></>}/>
@@ -1931,7 +1931,7 @@ return(
 </div>}
 
 {termIds.length>0&&<div className="card">
-<div className="card-head"><div><h2>Escala</h2>
+<div className="card-head"><div><h2>Viagem e operação</h2>
 <div className="sub">O que muda de viagem para viagem</div></div></div>
 <div className="grid">
 {companies.length>1&&
@@ -2287,7 +2287,7 @@ if(quotations.length===0)return(
 return(
 <div className="card">
 <div className="card-head"><div><h2>Histórico</h2>
-<div className="sub">{quotations.length} cotação(ões) salva(s) neste navegador</div></div></div>
+<div className="sub">{quotations.length} cotação(ões) — compartilhadas com toda a equipe</div></div></div>
 <div className="note note-info">
 Aprove a cotação quando o armador confirmar a escala. Só uma cotação aprovada pode originar a
 prestação de contas, que nasce com um voucher por conta prevista.
@@ -2740,7 +2740,7 @@ return(
 <div className="card-head"><div><h2>Contratos</h2>
 <div className="sub">Vínculos armador × terminal, mantidos no cadastro do armador</div></div></div>
 <div className="note note-info">
-Esta tela é um espelho. Para criar ou desfazer um contrato, abra o armador em <strong>Armadores</strong>
+Esta tela é um espelho. Para criar ou desfazer um contrato, abra o armador em <strong>Armadores</strong>{' '}
 e marque o terminal. O cálculo do wharfage lê daí.
 </div>
 {rows.length===0?<Empty title="Nenhum contrato registrado"
@@ -3488,8 +3488,10 @@ const R=useRole();
 const [cur,setCur]=useState(fda.currency==='BRL'?'BRL':'USD');
 const adv=(fda.advances||[]).map((a,i)=>a.id?a:{...a,id:'adv'+i});
 const fmt=cur==='BRL'?fBRL:fUSD;
+/* data do voucher no extrato: a mais recente entre as datas das despesas dele */
+const dataVoucher=v=>(v.expenses||[]).map(e=>e.date||'').filter(Boolean).sort().pop()||'';
 const deb=vouchers.map(v=>{const t=voucherTotal(v,fda.roe);
-  return{k:'v'+v.id,date:'',hist:'Voucher '+v.number+' · '+(v.accountName||''),roe:fda.roe,d:{BRL:t.brl,USD:t.usd},c:{BRL:0,USD:0},val:v.status==='validated'};});
+  return{k:'v'+v.id,date:dataVoucher(v),hist:'Voucher '+v.number+' · '+(v.accountName||''),roe:fda.roe,d:{BRL:t.brl,USD:t.usd},c:{BRL:0,USD:0},val:v.status==='validated'};});
 const cre=adv.slice().sort((a,b)=>String(a.date||'9').localeCompare(String(b.date||'9'))).map(a=>(
   {k:a.id,date:a.date,hist:'Adiantamento recebido'+(a.label?' · '+a.label:'')+(a.note?' — '+a.note:''),roe:a.roe||fda.roe,
    d:{BRL:0,USD:0},c:{BRL:Number(a.brl||0),USD:advUsdOf(a,fda)},val:true}));
@@ -5084,9 +5086,14 @@ const [rows,setRows]=useState(null), [reqs,setReqs]=useState([]);
 const [novo,setNovo]=useState({name:'',email:'',role:'operacional'});
 const [busy,setBusy]=useState(false);
 const meId=window.__PDX__.me.id;
+/* mensagens do banco traduzidas para quem usa o sistema (as que já vêm em português passam direto) */
 const erro=e=>{
   const m=(e&&(e.message||e.details))||String(e);
-  toast(/row-level security/i.test(m)?'Seu perfil não tem permissão para esta alteração':m,'bad');
+  toast(/row-level security|permission denied/i.test(m)?'Seu perfil não tem permissão para esta alteração'
+    :/duplicate key|unique/i.test(m)?(/email/i.test(m)?'Já existe um usuário com este e-mail':'Já existe um registro igual')
+    :/violates not-null/i.test(m)?'Há campo obrigatório em branco'
+    :/failed to fetch|network/i.test(m)?'Sem conexão com o servidor. A alteração não foi gravada.'
+    :m,'bad');
 };
 const carregar=async()=>{
   const [u,r]=await Promise.all([

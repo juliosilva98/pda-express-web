@@ -441,3 +441,27 @@ continua igual.
 
 **Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
 mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.
+
+## 13. Varredura de gaps como usuário leigo (21/10/2026)
+
+Claude percorreu todas as telas no site de homologação, logado como admin,
+**sem gravar nada**, viu o layout no celular (375 px) e revisou o código.
+
+| # | Gravidade | Gap | Situação |
+|---|---|---|---|
+| 1 | Grave | Não há como **cancelar** uma prestação (FDA/SDA): o banco proíbe excluir ("use o cancelamento"), mas nenhuma tela tem Cancelar | Aberto — ver como o banco prevê o cancelamento |
+| 2 | Grave | Cadastro de navio aceita GT/DWT absurdos (há navios com GT 32 / DWT 48); o PDA calcula praticagem e taxas sem avisar; a pendência só pega campo vazio | Aberto |
+| 3 | Grave | Armador sem endereço de faturamento: FDA e invoice podem ser emitidos sem o endereço do cliente | Aberto (pendência já avisa nos Cadastros) |
+| 4 | Grave | Uso real: falta projeto de produção, backup com restauração testada e e-mail próprio no Supabase (limite do gratuito) | Aberto (Fase 3) |
+| 5 | Média | Viagem não obrigatória: várias PDAs/FDAs "sem viagem"; com armador por escala fica difícil distinguir escalas do mesmo navio | Aberto — Julio decide se vira obrigatória |
+| 6 | Média | FDA avulsa ligada a um PDA não marca a cotação "FDA aberta" (o Gerar FDA continua aparecendo) | Aberto |
+| 7 | Média | Edição simultânea de cadastros: vale a última gravação, sem aviso | Aberto (limitação conhecida) |
+| 8 | Média | Mensagens técnicas em inglês na tela de Usuários | **Corrigido** (mesmas traduções de `traduzirErro`) |
+| 9 | Média | SDA: mesmas permissões do FDA e sem numeração própria | Aberto (a decidir) |
+| 10 | Leve | PDAs diziam "cotações salvas neste navegador" | **Corrigido**: "compartilhadas com toda a equipe" |
+| 11 | Leve | Nova cotação com dois blocos "Escala" | **Corrigido**: o segundo virou "Viagem e operação" |
+| 12 | Leve | Tela Contratos mostrava "Armadorese marque" | **Corrigido** (espaço) |
+| 13 | Leve | No celular as tabelas rolam para o lado e o ⋯ fica escondido | Aberto (nome clicável ameniza) |
+| 14 | Leve | Extrato da Conciliação sem data nas linhas de voucher | **Corrigido**: data mais recente entre as despesas do voucher |
+| 15 | Leve | Tela antiga "Backup e exportação" existe no código, fora do menu, e fala em "navegador" | Aberto |
+| 16 | Leve | Falta o segundo administrador (conferência de conta bancária exige dois) | Aberto |
