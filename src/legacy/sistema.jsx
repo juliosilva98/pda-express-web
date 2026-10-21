@@ -3001,25 +3001,45 @@ return(
 const normF=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const vOf=id=>(allV||[]).filter(v=>v.fdaId===id);
 const doTipo=fdas.filter(f=>tipo==='sda'?isSda(f):!isSda(f));
-const abertas=doTipo.filter(f=>!isClosed(f)), fechadas=doTipo.filter(isClosed);
-const base=(aba==='closed'?fechadas:abertas).filter(f=>!busca.trim()||normF(busca).split(/\s+/).every(t=>normF([f.vessel,f.voyage,f.invoiceNo,f.to].join(' ')).includes(t)));
+const abertas=doTipo.filter(f=>!isTravada(f)), fechadas=doTipo.filter(isClosed), canceladas=doTipo.filter(isCancelled);
+const daAba=aba==='closed'?fechadas:aba==='cancelled'?canceladas:abertas;
+const cancelDe=f=>(f.history||[]).filter(x=>x.action==='cancelled').pop()||{};
+const base=daAba.filter(f=>!busca.trim()||normF(busca).split(/\s+/).every(t=>normF([f.vessel,f.voyage,f.invoiceNo,f.to].join(' ')).includes(t)));
 const lista=base.slice().sort((x,y)=>String(aba==='closed'?y.closedAt||'':y.createdAt||'').localeCompare(String(aba==='closed'?x.closedAt||'':x.createdAt||'')));
 return(<>
 <div className="subnav" style={{marginBottom:14}}>
 <button className={aba==='open'?'active':''} onClick={()=>setAba('open')}>Em elaboração · {abertas.length}</button>
 <button className={aba==='closed'?'active':''} onClick={()=>setAba('closed')}>Finalizadas · {fechadas.length}</button>
+<button className={aba==='cancelled'?'active':''} onClick={()=>setAba('cancelled')}>Canceladas · {canceladas.length}</button>
 </div>
 {doTipo.length>0&&<div className="hist-tools">
 <input className="inp" value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Filtrar por navio, viagem, invoice ou armador" aria-label={tipo==='sda'?'Filtrar SDAs':'Filtrar FDAs'}/>
 {busca&&<button className="btn btn-line btn-sm" onClick={()=>setBusca('')}>Limpar</button>}
-<span style={{fontSize:'.8rem',color:'var(--fg-muted)',marginLeft:'auto'}}>{lista.length} de {aba==='closed'?fechadas.length:abertas.length}</span>
+<span style={{fontSize:'.8rem',color:'var(--fg-muted)',marginLeft:'auto'}}>{lista.length} de {daAba.length}</span>
 </div>}
 {lista.length===0
- ?(aba==='closed'
+ ?(aba==='cancelled'
+   ?<Empty title="Nenhuma prestação cancelada" text="Prestações não são apagadas: quando uma é cancelada, ela aparece aqui com o motivo."/>
+   :aba==='closed'
    ?<Empty title={tipo==='sda'?'Nenhuma SDA finalizada':'Nenhuma prestação finalizada'} text={'Quando todas as condições forem atendidas, finalize a prestação na aba Fechamento da '+(tipo==='sda'?'SDA.':'FDA.')}/>
    :tipo==='sda'
    ?<Empty title="Nenhuma SDA em elaboração" text="Crie uma SDA avulsa ou gere uma a partir de um FDA finalizado (aba FDAs › Finalizadas › ⋯ › Gerar SDA)."/>
    :<Empty title="Nenhuma prestação em elaboração" text="Crie uma FDA ou gere uma a partir de um PDA aprovado."/>)
+ :aba==='cancelled'
+ ?<div className="tscroll"><table>
+<thead><tr><th>Navio</th><th>Viagem</th><th>Porto</th><th>Origem</th><th>Cancelada em</th><th>Motivo</th><th className="ta-c">Ações</th></tr></thead>
+<tbody>{lista.map(f=>{const h=cancelDe(f);return(
+<tr key={f.id} className="row-closed">
+<td style={{fontWeight:600}}>{chipSda(f)}<button type="button" className="nome-link" onClick={()=>setOpenId(f.id)}>{f.vessel||'—'}</button>
+<div style={{marginTop:4}}><span className="chip chip-bad">Cancelada</span></div></td>
+<td className="num">{f.voyage||'—'}</td>
+<td>{f.port||'—'}</td>
+<td>{origemDe(f)}</td>
+<td style={{fontSize:'.8rem'}}><span className="num">{h.at?fDT(h.at):'—'}</span>{h.byName&&<div style={{color:'var(--fg-muted)'}}>{h.byName}</div>}</td>
+<td style={{fontSize:'.82rem'}}>{h.note||'—'}</td>
+<td><Acoes>
+<button className="btn btn-line btn-sm" onClick={()=>setOpenId(f.id)}>Abrir</button>
+</Acoes></td></tr>);})}</tbody></table></div>
  :aba==='open'
  ?<div className="tscroll"><table>
 <thead><tr><th>Navio</th><th>Viagem</th><th>Porto</th><th>Origem</th><th>Andamento</th><th className="ta-r">Despesas</th><th className="ta-r">Criada em</th><th className="ta-c">Ações</th></tr></thead>
@@ -3097,8 +3117,28 @@ const nVal=list.filter(isVal).length;
 const pendentes=list.filter(v=>!isVal(v));
 const tudoValidado=list.length>0&&pendentes.length===0;
 const furoNum=list.some((v,i)=>Number(v.number)!==i+1);
-const locked=isClosed(fda);
-const travada=()=>{ toast('Prestação finalizada — reabra para alterar','bad'); };
+const locked=isTravada(fda);
+const cancelada=isCancelled(fda);
+const travada=()=>{ toast(msgTravada(fda),'bad'); };
+const [cancelar,setCancelar]=useState(false);
+const [motivoC,setMotivoC]=useState('');
+const confirmarCancelamento=async()=>{
+  if(!R.can('fda_finalizar'))return toast('Seu perfil não cancela prestações','bad');
+  if(motivoC.trim().length<5)return toast('Explique o motivo do cancelamento','bad');
+  const at=new Date().toISOString();
+  await caps.db.doc('fdas/'+fda.id).update({status:'cancelled',
+    history:[...(fda.history||[]),{at,by:R.me.id||'local',byName:R.me.name||'',action:'cancelled',note:motivoC.trim()}]});
+  setCancelar(false); setMotivoC('');
+  toast('Prestação cancelada','ok');
+};
+const reativar=async()=>{
+  if(!R.can('fda_reabrir'))return toast('Só o administrador reativa uma prestação cancelada','bad');
+  const ok=await ask({title:'Reativar prestação',confirmLabel:'Reativar',
+    message:'A prestação volta para "Em elaboração" e pode ser editada de novo. O cancelamento continua no histórico.'});
+  if(!ok)return;
+  await caps.db.doc('fdas/'+fda.id).update({status:'open',closedAt:null,closing:null});
+  toast('Prestação reativada','ok');
+};
 const varCell=(v,t)=>{
   const e=Number(v.estimatedUsd||0);
   if(!e||!t.usd)return <span style={{color:'var(--fg-muted)'}}>—</span>;
@@ -3167,9 +3207,27 @@ return(
     :'#'+String(fda.parentFdaId).slice(-6)}</>
   :' · SDA avulsa')}</div>
 </div>
+<div className="actions">
 {!locked&&<button className="btn btn-line btn-sm" onClick={()=>setEditHdr(true)}>Editar cabeçalho</button>}
+{!cancelada&&R.can('fda_finalizar')&&<button className="btn btn-bad btn-sm" onClick={()=>setCancelar(true)}>Cancelar prestação</button>}
 </div>
-{locked&&<div className="closed-banner">
+</div>
+{cancelada&&<div className="note note-bad" style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+<span style={{flex:1,minWidth:220}}><strong>Prestação cancelada</strong>
+{(()=>{const h=(fda.history||[]).filter(x=>x.action==='cancelled').pop();
+  return h?<> em {fDT(h.at)}{h.byName?' por '+h.byName:''}{h.note?' — '+h.note:''}</>:null;})()} · edição travada</span>
+{R.can('fda_reabrir')&&<button className="btn btn-line btn-sm" onClick={reativar}>Reativar prestação</button>}
+</div>}
+{cancelar&&<Dialog size="sm" title="Cancelar prestação" sub={(fda.vessel||'')+(fda.voyage?' · '+fda.voyage:'')} onClose={()=>setCancelar(false)}>
+<div className="note note-warn">A prestação não é apagada: sai das listas de trabalho, vai para <strong>Canceladas</strong> e fica travada.
+O cancelamento e o motivo ficam no histórico. Um administrador pode reativá-la depois.</div>
+<div className="field"><label>Motivo do cancelamento *</label>
+<textarea rows="3" value={motivoC} onChange={e=>setMotivoC(e.target.value)} placeholder="Ex: Prestação criada em duplicidade."/></div>
+<div className="form-actions">
+<button type="button" className="btn btn-line btn-sm" onClick={()=>setCancelar(false)}>Voltar</button>
+<button type="button" className="btn btn-bad btn-sm" onClick={confirmarCancelamento}>Cancelar prestação</button></div>
+</Dialog>}
+{isClosed(fda)&&<div className="closed-banner">
 <strong>Prestação finalizada</strong>
 <span>em {fDT(fda.closedAt)}{(fda.closing||{}).byName?' por '+fda.closing.byName:''} · edição travada</span>
 <button className="btn btn-line btn-sm" style={{marginLeft:'auto'}} onClick={()=>setTab('close')}>Ver fechamento</button>
@@ -3280,6 +3338,10 @@ const fdaFingerprint=(fda,vouchers)=>{
   return (h>>>0).toString(36);
 };
 const isClosed=f=>!!f&&f.status==='closed';
+/* cancelada: prestação não se exclui; cancela-se (o banco registra em fda_event, com o motivo) */
+const isCancelled=f=>!!f&&f.status==='cancelled';
+const isTravada=f=>isClosed(f)||isCancelled(f);
+const msgTravada=f=>isCancelled(f)?'Prestação cancelada — reative para alterar':'Prestação finalizada — reabra para alterar';
 /* SDA: prestação de contas suplementar, depois do FDA finalizado (a partir de um FDA ou avulsa).
    Por dentro é igual ao FDA; muda a sigla, o título dos PDFs e a origem. */
 const isSda=f=>!!f&&f.kind==='sda';
@@ -3391,7 +3453,7 @@ const exportFda=async withDocs=>{
   try{
     const ok=await buildFdaPdf({fda,vouchers,rows,subBrl,subUsd,advBrl,advUsd,dueBrl,dueUsd,caps,withDocs});
     /* registra a geração para o fechamento — só vale para o conteúdo exato que foi gerado */
-    if(ok&&caps.db&&!isClosed(fda)){
+    if(ok&&caps.db&&!isTravada(fda)){
       await caps.db.doc('fdas/'+fda.id).update({exports:{...(fda.exports||{}),
         [withDocs?'docs':'plain']:{at:new Date().toISOString(),fp:fdaFingerprint(fda,vouchers),by:R.me.id||'local',byName:R.me.name||''}}});
     }
@@ -3507,7 +3569,7 @@ const temVar=adv.some(a=>Number(a.roe||fda.roe)!==Number(fda.roe))&&Math.abs(var
 const pend=vouchers.filter(v=>v.status!=='validated').length;
 
 const saveAdv=async next=>{
-  if(isClosed(fda))return toast('Prestação finalizada — reabra para alterar','bad');
+  if(isTravada(fda))return toast(msgTravada(fda),'bad');
   if(!R.can('fda_editar'))return toast('Seu perfil não altera adiantamentos','bad');
   await caps.db.doc('fdas/'+fda.id).update({advances:next.map(({id,...x})=>({id:id||uid(),...x}))});
   toast('Adiantamentos atualizados','ok');
@@ -3564,7 +3626,7 @@ Os adiantamentos foram convertidos pela ROE de cada recebimento. Pela ROE da FDA
 
 <div className="panel">
 <div className="panel-head"><h3>Adiantamentos recebidos</h3></div>
-<fieldset className="lockset" disabled={isClosed(fda)}>
+<fieldset className="lockset" disabled={isTravada(fda)}>
 <ItemList items={adv} onChange={saveAdv} addLabel="Lançar adiantamento" empty="Nenhum adiantamento lançado."
   newItem={()=>({id:uid(),label:'',date:'',brl:0,roe:fda.roe,note:''})}
   confirmDel={a=>'O adiantamento '+(a.label||fBRL(a.brl))}
@@ -3624,7 +3686,8 @@ const alterada=closed&&c.fp&&c.fp!==ck.fp;
 
 return(
 <div>
-{closed?<>
+{isCancelled(fda)?<div className="note note-bad"><strong>Prestação cancelada.</strong> Não pode ser finalizada; um administrador pode reativá-la pelo aviso no topo da prestação.</div>
+:closed?<>
 <div className="closed-banner" style={{marginBottom:14}}>
 <strong>Finalizada em {fDT(fda.closedAt)}</strong>
 <span>{c.byName?'por '+c.byName+' · ':''}{c.vouchers||0} voucher(s) · {c.docs||0} comprovante(s)</span>
@@ -3672,7 +3735,7 @@ Só é possível com todas as condições obrigatórias atendidas.
 <div className="panel-head"><h3>Histórico do fechamento</h3></div>
 {hist.map((h,i)=>(
 <div className="hist-ev" key={i}>
-<span className={'chip '+(h.action==='closed'?'chip-ok':'chip-warn')}>{h.action==='closed'?'Finalizada':'Reaberta'}</span>
+<span className={'chip '+(h.action==='closed'?'chip-ok':h.action==='cancelled'?'chip-bad':'chip-warn')}>{h.action==='closed'?'Finalizada':h.action==='cancelled'?'Cancelada':'Reaberta'}</span>
 {' '}<span className="num">{fDT(h.at)}</span>{h.byName?' · '+h.byName:''}
 {h.action==='closed'&&h.totalUsd!=null?<span style={{color:'var(--fg-muted)'}}> · {fUSD(h.totalUsd)} · saldo {fUSD(h.saldoUsd)}</span>:null}
 {h.note&&<div style={{color:'var(--fg-muted)',marginTop:3}}>{h.note}</div>}
@@ -3701,9 +3764,9 @@ const exps=voucher.expenses||[];
 const t=voucherTotal(voucher,fda.roe);
 
 /* Qualquer alteração reabre o voucher: o que foi validado foi aquele conteúdo */
-const locked=isClosed(fda);
+const locked=isTravada(fda);
 const write=async next=>{
-  if(locked){ toast('Prestação finalizada — reabra para alterar','bad'); return; }
+  if(locked){ toast(msgTravada(fda),'bad'); return; }
   const patch={expenses:next};
   if(voucher.status==='validated'){patch.status='pending';patch.validatedAt=null;}
   await caps.db.doc('vouchers/'+voucher.id).update(patch);

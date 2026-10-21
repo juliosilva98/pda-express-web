@@ -141,6 +141,10 @@ async function gravarFda(antes, depois) {
     } else if (st0 === 'closed' && st1 === 'open') {
       const h = (depois.history || []).filter((x) => x.action === 'reopened').pop();
       patch.reopen_reason = (h && h.note) || '';
+    } else if (st1 === 'cancelled') {
+      // o gatilho fn_fda_close_guard grava o evento 'cancelled' com closing_note como motivo
+      const h = (depois.history || []).filter((x) => x.action === 'cancelled').pop();
+      patch.closing_note = (h && h.note) || null;
     }
   }
   if (Object.keys(patch).length) await ok(supabase.from('fda').update(patch).eq('id', id), 'Prestação');

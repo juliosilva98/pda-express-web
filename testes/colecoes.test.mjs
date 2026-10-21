@@ -89,6 +89,13 @@ ctx.log.length = 0;
 await db.doc('fdas/' + sdaRow.id).update({ remarks: 'teste' });
 await espera(500);
 conf('editar SDA não regrava o tipo', !('kind' in (DB.fda.find((x) => x.id === sdaRow.id).extra || {})) && DB.fda.find((x) => x.id === sdaRow.id).kind === 'sda');
+// 11) cancelar prestação: grava status 'cancelled' e o motivo em closing_note (o banco registra o evento)
+r = await db.collection('fdas').add({ vessel: 'NAVIO TESTE', to: 'Empresa Teste Ltda', roe: 5 });
+f = (await db.doc('fdas/' + r.id).get()).data();
+await db.doc('fdas/' + r.id).update({ status: 'cancelled', history: [...(f.history || []), { at: 'x', action: 'cancelled', note: 'Criada em duplicidade' }] });
+await espera(500);
+const linhaCanc = DB.fda.find((x) => x.id === r.id);
+conf('cancelar grava status e motivo', linhaCanc.status === 'cancelled' && linhaCanc.closing_note === 'Criada em duplicidade');
 // 8) download de PDF responde 'saved': sem isso o sistema não registra a geração e a FDA não finaliza
 document.createElement = () => ({ click() {}, remove() {} }); document.body = { appendChild() {} };
 URL.createObjectURL = () => 'blob:x'; URL.revokeObjectURL = () => {};

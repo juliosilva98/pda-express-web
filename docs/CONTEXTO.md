@@ -191,7 +191,7 @@ imita essas duas interfaces e traduz para tabelas:
 
 ## 8. Testes
 
-**Automáticos (`npm test`, 24 testes, banco falso em memória):** adiantamento
+**Automáticos (`npm test`, 25 testes, banco falso em memória):** adiantamento
 (editar sem duplicar, incluir, excluir); despesa de voucher validado alterada
 por operacional; validação recusada sem permissão; voucher manual por perfil;
 despesas do PDA num envio, na ordem, editáveis; renumerar sem regravar
@@ -449,7 +449,7 @@ Claude percorreu todas as telas no site de homologação, logado como admin,
 
 | # | Gravidade | Gap | Situação |
 |---|---|---|---|
-| 1 | Grave | Não há como **cancelar** uma prestação (FDA/SDA): o banco proíbe excluir ("use o cancelamento"), mas nenhuma tela tem Cancelar | Aberto — ver como o banco prevê o cancelamento |
+| 1 | Grave | Não há como **cancelar** uma prestação (FDA/SDA): o banco proíbe excluir ("use o cancelamento"), mas nenhuma tela tem Cancelar | **Feito (falta testar no site):** botão "Cancelar prestação" no topo da prestação (financeiro e admin, permissão `fda_finalizar`, motivo obrigatório); status `cancelled` + motivo em `closing_note`, que o gatilho `fn_fda_close_guard` grava em `fda_event`; aba **Canceladas** nas listas de FDA e SDA; prestação cancelada fica travada; **Reativar** (só admin, `fda_reabrir`) volta para "Em elaboração" — o banco não registra evento de reativação. Pendente: PDA cuja FDA foi cancelada continua "FDA aberta" e sem "Gerar FDA" |
 | 2 | Grave | Cadastro de navio aceita GT/DWT absurdos (há navios com GT 32 / DWT 48); o PDA calcula praticagem e taxas sem avisar; a pendência só pega campo vazio | Aberto |
 | 3 | Grave | Armador sem endereço de faturamento: FDA e invoice podem ser emitidos sem o endereço do cliente | Aberto (pendência já avisa nos Cadastros) |
 | 4 | Grave | Uso real: falta projeto de produção, backup com restauração testada e e-mail próprio no Supabase (limite do gratuito) | Aberto (Fase 3) |
