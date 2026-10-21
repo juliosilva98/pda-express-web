@@ -146,6 +146,10 @@ Regras do banco:
   fica só para o que o operacional lança (e ele não tem permissão de
   validar). Só o trecho da segregação em `fn_voucher_sod` mudou; o resto da
   função foi copiado da versão em uso (lida com `pg_get_functiondef`).
+  Na primeira aplicação a função não ficou gravada (a leitura mostrou a
+  versão antiga); rodado de novo o arquivo inteiro, conferência `true` e
+  teste no site: administrador lançou despesa e validou o próprio voucher
+  (21/10). `current_app_user()` devolve `app_user.id` (conferido).
 - **Despesa alterada reabre o voucher** (gatilho `trg_reopen_expense`).
 - Fechamento da FDA com as mesmas condições do sistema (seção 7).
 - Conta bancária nova ou alterada fica "não conferida"; outra pessoa confere;
