@@ -1,4 +1,4 @@
-# PDA Express — contexto do projeto
+# Gestão de Custeio Seatrade (antigo PDA Express) — contexto do projeto
 
 **Atualizado em:** 19/10/2026
 **Responsável:** Julio
@@ -19,12 +19,22 @@ e anteriores), fora do GitHub.
 - Testes manuais 1 a 6 aprovados no site (seção 8). O teste 6 (finalizar e
   reabrir) passou depois que as correções de 19/10 foram enviadas ao GitHub
   (seção 9, itens 6 e 8).
-- Último envio ao GitHub: 19/10/2026 (commit `b9195fd`, "Add files via
-  upload").
-- No computador do Julio não há Git nem Node: `npm run build` e `npm test` não
-  rodam aqui (o build roda no GitHub Actions). Os envios são feitos pelo site
-  do GitHub, e a cópia de trabalho fica em
+- Último envio ao GitHub: 19/10/2026 (commit `004b33f`, "Add files via
+  upload"). Esta versão do CONTEXTO.md, com o fechamento do dia, vai no
+  próximo envio da pasta `docs`.
+- No computador do Julio não há Git. Os envios são feitos pelo site do GitHub
+  (Add file › Upload files), e a cópia de trabalho fica em
   `OneDrive - Seatrade\Projeto gestão de Custeio Seatrade\pda-express-web`.
+- Node 20.18.0 **portátil** (zip oficial do nodejs.org, SHA-256 conferido) em
+  `%LOCALAPPDATA%\node-portable\node-v20.18.0-win-x64`. Build e testes rodam
+  numa cópia fora do OneDrive, `%USERPROFILE%\pdx-build` (o OneDrive não deve
+  sincronizar `node_modules`; e `%LOCALAPPDATA%` não serve para o build porque
+  o app do Claude redireciona essa pasta e o Vite falha). Ver "Comandos" no
+  `CLAUDE.md`.
+- **Pacote de mudanças de 19/10 à tarde, publicado e testado na
+  homologação:** nome do sistema → "Gestão de Custeio Seatrade"; menu ⋯ na
+  coluna Ações; pré-visualização dos PDFs; cabeçalho do FDA buscando PDA e
+  navio; SDA (seção 12). `database/07_sda.sql` aplicado na homologação.
 - **Produção ainda não existe.** Tudo o que está no ar é homologação.
 - Decisão de 19/10: o trabalho continua **só neste repositório**
   (`pda-express-web`). O repositório privado `pda-express` fica como arquivo
@@ -41,7 +51,7 @@ e anteriores), fora do GitHub.
 | @supabase/supabase-js | 2.45.4 (sessão no navegador, `flowType: 'implicit'`) |
 | pdf-lib | 1.17.1 (geração de PDF no navegador, exposta como `window.PDFLib`) |
 | Node no GitHub Actions | 20 |
-| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 aplicados na homologação |
+| Banco | arquivos 01 → 02 → 03 → 04 → 05 (v3.2) → 04b → 06 → 07 (SDA) → 08 (armador do navio opcional) → 09 (dupla validação só para operacional, 21/10) → 10 (feriados, 23/11) aplicados na homologação |
 
 ## 3. Linha do tempo
 
@@ -130,7 +140,16 @@ Regras do banco:
 - RLS em todas as tabelas; sem login, nada.
 - Autoria gravada pelo banco (ninguém lança em nome de outro).
 - **Segregação:** quem lançou despesa num voucher não pode validá-lo
-  (confirmado no site em 19/10).
+  (confirmado no site em 19/10). **Mudança de 21/10 (decisão do Julio,
+  `database/09_dupla_validacao_so_operacional.sql`):** financeiro e
+  administrador podem lançar e validar o próprio voucher; a dupla validação
+  fica só para o que o operacional lança (e ele não tem permissão de
+  validar). Só o trecho da segregação em `fn_voucher_sod` mudou; o resto da
+  função foi copiado da versão em uso (lida com `pg_get_functiondef`).
+  Na primeira aplicação a função não ficou gravada (a leitura mostrou a
+  versão antiga); rodado de novo o arquivo inteiro, conferência `true` e
+  teste no site: administrador lançou despesa e validou o próprio voucher
+  (21/10). `current_app_user()` devolve `app_user.id` (conferido).
 - **Despesa alterada reabre o voucher** (gatilho `trg_reopen_expense`).
 - Fechamento da FDA com as mesmas condições do sistema (seção 7).
 - Conta bancária nova ou alterada fica "não conferida"; outra pessoa confere;
@@ -172,7 +191,7 @@ imita essas duas interfaces e traduz para tabelas:
 
 ## 8. Testes
 
-**Automáticos (`npm test`, 16 testes, banco falso em memória):** adiantamento
+**Automáticos (`npm test`, 25 testes da gravação + 6 do vigia, banco falso em memória):** adiantamento
 (editar sem duplicar, incluir, excluir); despesa de voucher validado alterada
 por operacional; validação recusada sem permissão; voucher manual por perfil;
 despesas do PDA num envio, na ordem, editáveis; renumerar sem regravar
@@ -260,6 +279,36 @@ administrador).
    caminho, despesa, voucher e prestação. Aplicado na homologação em 19/10;
    conferência devolveu 1 linha (o voucher removido no teste,
    `voucher_removido = true`). Para produção: rodar o 06 depois dos demais.
+10. (19/10) Usuária cadastrada em Usuários ("convite pendente") conseguiu
+   entrar, mas o login **não** foi ligado ao cadastro: ela caiu em
+   "Solicitações de acesso". Ao clicar em "Liberar como…", o sistema tentava
+   **criar outro** `app_user` com o mesmo e-mail e o banco recusou
+   (`app_user_email_key`). Primeira correção (ligar pelo site, gravando
+   `auth_id`) foi recusada pelo banco: "O vínculo com o login não pode ser
+   alterado pelo sistema" — regra dos arquivos 01–03. Correção final em
+   `sistema.jsx` (`aprovar`): se já existe cadastro com o mesmo e-mail, não
+   tenta inserir nem ligar; mostra um aviso explicando que a ligação é feita
+   no SQL Editor. **Procedimento no SQL Editor** (trocar o e-mail; não gravar
+   em arquivo do repositório, porque tem dado pessoal):
+   ```sql
+   begin;
+   update app_user a set auth_id = u.id, active = true
+     from auth.users u
+    where lower(u.email) = '<email>' and lower(a.email) = lower(u.email)
+      and a.auth_id is null;
+   update access_request
+      set status = 'approved', granted_role = '<perfil>', decided_at = now(),
+          decided_by = (select id from app_user where lower(email) = '<email do admin>')
+    where lower(email) = '<email>' and status = 'pending';
+   commit;
+   ```
+   **Provável causa:** a conta foi criada no Supabase **antes** do cadastro em
+   Usuários (ou entrou antes dele existir); a ligação automática do banco não
+   cobre essa ordem. Ordem certa: cadastrar em Usuários → depois enviar o
+   convite. **Em aberto:** confirmar a causa olhando as regras do banco.
+   Caso de 19/10 resolvido com o procedimento acima. A "senha incorreta" que
+   continuou depois era o navegador preenchendo uma senha antiga salva;
+   digitando à mão, entrou.
 
 ## 10. Pendências e próximos passos
 
@@ -294,3 +343,160 @@ Não acessível aqui. Contém: sistema antigo (`legacy/`), arquivos de banco
 da carga, regressão do motor de cálculo, testes no navegador — algumas com
 trechos de dados de clientes) e documentação. As cargas `04_carga_homolog.sql`
 e `04b_carga_complemento.sql` ficam fora de qualquer repositório.
+
+## 12. Mudanças de layout e SDA (19/10/2026, pedidas pelo Julio)
+
+Primeira "reforma" depois da mudança de casa — pedida explicitamente. O motor
+de cálculo não foi tocado.
+
+| Pedido | Como ficou | Onde |
+|---|---|---|
+| Nome do sistema | "Gestão de Custeio Seatrade" na aba do navegador, no login e no topo. O repositório e o endereço do site continuam `pda-express-web`. Textos dos e-mails de convite ficam no Supabase (Authentication › Email Templates), fora do código | `index.html`, `Raiz.jsx`, `sistema.jsx` |
+| Coluna Ações | Botão ⋯ que abre os botões num menu suspenso (componente `Acoes`, renderizado no `body`; fecha ao escolher, clicar fora, rolar ou Esc). As 10 tabelas trocaram só a "casca" (`<div className="actions">` → `<Acoes>`); os botões e as regras de quem vê cada um são os mesmos | `sistema.jsx`, `sistema.css` |
+| Pré-visualização dos PDFs | `downloads.save` abre uma janela com o PDF (iframe) e os botões Baixar/Fechar. Só **Baixar** grava no computador e responde `status: 'saved'` — portanto só ele registra a geração da FDA para o fechamento. Fechar/Esc responde `cancelled`. Arquivos que não são PDF (backup JSON) baixam direto. Se a pessoa baixar pelo botão do próprio visualizador do navegador, a geração **não** é registrada | `colecoes.js`, `sistema.css`; 3 testes |
+| Cabeçalho do FDA | Na aba Escala, painel "Preencher a partir de": **Cotação (PDA)** preenche navio, viagem, porto, câmbio, medidas, quantidades e liga o FDA ao PDA (`pdaId`); se a cotação tem armador, também a Fatura e remessa. **Navio cadastrado** preenche nome e medidas e, pelo armador do navio, a Fatura e remessa. O seletor de armador na Fatura e remessa continua. Ligar um FDA manual a um PDA **não** marca a cotação como "já tem FDA" (o botão Gerar FDA continua aparecendo nela) | `sistema.jsx` (`FdaHeaderDialog`, contexto `FontesFdaCtx`) |
+| SDA | Mesma tabela e mesmas telas do FDA, com `kind = 'sda'` e `parent_fda_id`. Criar: **Nova SDA avulsa** (topo da lista) ou **Gerar SDA** no ⋯ de um FDA finalizado — herda só o cabeçalho (`CAMPOS_CABECALHO`); invoice, adiantamentos e vouchers começam vazios. Etiqueta SDA nas listas e no detalhe, link para o FDA de origem, PDF com título "SUPPLEMENTARY DISBURSEMENT ACCOUNT" e arquivo "SDA - …". Banco: `database/07_sda.sql` (colunas, restrições e gatilho `trg_fda_sda`: origem precisa ser FDA finalizado; tipo não muda). O front só envia `kind`/`parent_fda_id` quando o documento tem esses campos, então FDAs continuam funcionando mesmo antes do 07 | `sistema.jsx`, `colecoes.js`, `07_sda.sql`; 4 testes |
+
+**Conferido aqui:** `npm run build` e `npm test` (23 testes).
+
+**Na homologação (19/10, 07 aplicado; commit `e113330`), Claude no navegador
+do app com o Julio logado como admin:** nome novo no login e no topo; menu ⋯
+abre (para cima perto do fim da tela) e fecha com Esc; "Gerar SDA" aparece só
+no FDA finalizado; formulário "Nova SDA" com aviso do FDA de origem, cabeçalho
+e Fatura e remessa herdados, invoice vazia; pré-visualização do PDF abre com
+as 3 páginas e Fechar não baixa nem deixa o botão travado; "Preencher a
+partir de" › Cotação preenche navio, porto, câmbio, GRT, DWT e LOA. **Erro
+encontrado e corrigido:** a cotação escolhida tinha um armador desativado no
+cadastro, e a Fatura e remessa ficava vazia; agora usa, como a geração a
+partir do PDA, a cópia do armador guardada na cotação (publicada em 19/10,
+commit `004b33f`). **SDA salva (com OK do Julio):** "Gerar SDA" a partir do FDA de
+teste TESTE2613 com invoice `SDA-TESTE-1` → mensagem "SDA criada", etiqueta
+SDA, link "complementar ao FDA", 0 vouchers; no banco `kind = 'sda'`, aberta,
+`parent_fda_id` = FDA finalizado. Essa SDA de teste fica na homologação
+(prestação não se exclui; pode ser cancelada). **Recusa do banco:** inserir
+SDA com origem num FDA **aberto** (NAVIO TESTE) foi recusado com "A SDA só
+pode partir de um FDA finalizado" e nada foi criado. **Ajuste:** os botões da
+Main Cover diziam "Gerar FDA em PDF" / "FDA + comprovantes" também na SDA;
+agora usam a sigla (publicada em 19/10, commit `004b33f`). **Não visto na tela:** o título
+"SUPPLEMENTARY DISBURSEMENT ACCOUNT" no PDF — a SDA de teste não tem vouchers
+validados, e sem isso o sistema não emite o PDF.
+
+**Decisão do Julio (19/10): a SDA tem lista própria.** Aba **SDAs** no topo,
+ao lado de FDAs (mesmo componente `FdaModule`, com `tipo="sda"`; cada aba
+lista só o seu tipo, com Em elaboração / Finalizadas). A aba FDAs ficou só com
+"Nova FDA"; "Nova SDA avulsa" está na aba SDAs; "Gerar SDA" continua no ⋯ do
+FDA finalizado e, ao salvar, leva para a aba SDAs com a SDA aberta.
+Publicado em 19/10 (commit `c4118d8`) e conferido na homologação: aba SDAs
+com a SDA de teste (origem "Do FDA …"), aba FDAs com 11 em elaboração e 1
+finalizada, sem nenhuma SDA, e só o botão "Nova FDA". Não testado na tela: o
+salto automático para a aba SDAs ao salvar um "Gerar SDA" (exigiria criar
+outra SDA).
+
+**Adiantamento em US$ (pedido do Julio, 19/10):** na Conciliação, o
+formulário de adiantamento pede **Valor recebido US$** e a ROE do
+recebimento, e mostra o valor convertido em R$ (US$ × ROE, arredondado a
+centavos). O banco continua guardando `amount_brl` e `roe` (o fechamento, a
+impressão digital e os PDFs não mudaram); o US$ digitado vai em `usd`
+(`fda_advance.extra`). Adiantamento antigo, lançado em R$, abre com o US$
+calculado (R$ ÷ ROE) e, se não mudar US$ nem ROE, mantém o R$ original sem
+arredondar. 1 teste novo (24 no total). Publicado em 19/10 (commit
+`30025bd`) e conferido na homologação sem salvar: campo "Valor recebido US$",
+US$ 1.000 × ROE 5,1 → "Convertido: R$ 5.100,00".
+
+**Armador por escala (decisão do Julio, 19/10):** um mesmo navio pode ter
+armadores diferentes em momentos diferentes; o armador pertence à escala.
+- Cadastro do navio: campo virou **"Armador atual (sugestão)"**, opcional;
+  "sem armador" deixou de ser pendência; coluna "Armador atual" na lista.
+  Banco: `database/08_navio_armador_opcional.sql` (tira o `not null` de
+  `vessel.shipowner_id`, se houver).
+- Cotação (PDA): campo **"Armador desta escala \*"** saiu do bloco Navio e
+  foi para o bloco Escala; continua obrigatório para calcular. Escolher o
+  navio só sugere o armador dele se o campo estiver vazio (antes
+  substituía).
+- FDA/SDA: **toda prestação precisa de armador** — o cabeçalho não salva sem
+  "Armador da escala" (leva para a aba Fatura e remessa). "Preencher a partir
+  de › Navio cadastrado" preenche só nome e medidas (antes trazia o armador
+  do navio). Armador que saiu do cadastro aparece como "(fora do cadastro
+  atual)". O FDA gerado do PDA continua trazendo o armador da cotação.
+- Histórico de armadores por navio: não agora (decisão do Julio).
+- Não muda cotações nem prestações já gravadas. Prestações antigas sem
+  armador só pedem a escolha quando o cabeçalho for editado.
+- Publicado em 21/10 (commit `a5a5343`) e conferido na homologação sem
+  gravar: cotação com "Armador desta escala \*" no bloco Escala e sem o campo
+  no bloco Navio; escolher navio com o campo vazio sugeriu o armador dele (só
+  há 1 armador ativo, então "manter o já escolhido" foi conferido só no
+  código); cadastro de navio com "Armador atual (sugestão)" e "— nenhum —",
+  sem aviso "Sem armador"; Nova FDA com só o navio preenchido foi recusada
+  ("Escolha o armador da escala…"), abriu a aba Fatura e remessa e não criou
+  nada (13 prestações antes e depois). Banco 08 aplicado na homologação
+  (conferência `is_nullable = YES`, 21/10).
+
+**Nome clicável nas tabelas (pedido do Julio, 21/10):** o nome em negrito
+abre o item, como a primeira opção do ⋯ — PDAs (navio → abre a cotação),
+FDAs e SDAs em elaboração e finalizadas (navio → abre a prestação),
+vouchers (conta → abre o voucher) e, nos cadastros, empresas, terminais,
+fornecedores, navios e armadores (nome → abre a edição). Botão
+`.nome-link` (aparência de texto, sublinha ao passar o mouse). O menu ⋯
+continua igual.
+
+**Pontos para decidir depois:** permissões específicas para SDA (hoje usa as
+mesmas do FDA: `fda_editar` etc.); numeração própria de invoice para SDA.
+
+## 13. Varredura de gaps como usuário leigo (21/10/2026)
+
+Claude percorreu todas as telas no site de homologação, logado como admin,
+**sem gravar nada**, viu o layout no celular (375 px) e revisou o código.
+
+| # | Gravidade | Gap | Situação |
+|---|---|---|---|
+| 1 | Grave | Não há como **cancelar** uma prestação (FDA/SDA): o banco proíbe excluir ("use o cancelamento"), mas nenhuma tela tem Cancelar | **Feito (falta testar no site):** botão "Cancelar prestação" no topo da prestação (financeiro e admin, permissão `fda_finalizar`, motivo obrigatório); status `cancelled` + motivo em `closing_note`, que o gatilho `fn_fda_close_guard` grava em `fda_event`; aba **Canceladas** nas listas de FDA e SDA; prestação cancelada fica travada; **Reativar** (só admin, `fda_reabrir`) volta para "Em elaboração" — o banco não registra evento de reativação. Pendente: PDA cuja FDA foi cancelada continua "FDA aberta" e sem "Gerar FDA" |
+| 2 | Grave | Cadastro de navio aceita GT/DWT absurdos (há navios com GT 32 / DWT 48); o PDA calcula praticagem e taxas sem avisar; a pendência só pega campo vazio | Aberto |
+| 3 | Grave | Armador sem endereço de faturamento: FDA e invoice podem ser emitidos sem o endereço do cliente | Aberto (pendência já avisa nos Cadastros) |
+| 4 | Grave | Uso real: falta projeto de produção, backup com restauração testada e e-mail próprio no Supabase (limite do gratuito) | Aberto (Fase 3) |
+| 5 | Média | Viagem não obrigatória: várias PDAs/FDAs "sem viagem"; com armador por escala fica difícil distinguir escalas do mesmo navio | Aberto — Julio decide se vira obrigatória |
+| 6 | Média | FDA avulsa ligada a um PDA não marca a cotação "FDA aberta" (o Gerar FDA continua aparecendo) | Aberto |
+| 7 | Média | Edição simultânea de cadastros: vale a última gravação, sem aviso | Aberto (limitação conhecida) |
+| 8 | Média | Mensagens técnicas em inglês na tela de Usuários | **Corrigido** (mesmas traduções de `traduzirErro`) |
+| 9 | Média | SDA: mesmas permissões do FDA e sem numeração própria | Aberto (a decidir) |
+| 10 | Leve | PDAs diziam "cotações salvas neste navegador" | **Corrigido**: "compartilhadas com toda a equipe" |
+| 11 | Leve | Nova cotação com dois blocos "Escala" | **Corrigido**: o segundo virou "Viagem e operação" |
+| 12 | Leve | Tela Contratos mostrava "Armadorese marque" | **Corrigido** (espaço) |
+| 13 | Leve | No celular as tabelas rolam para o lado e o ⋯ fica escondido | Aberto (nome clicável ameniza) |
+| 14 | Leve | Extrato da Conciliação sem data nas linhas de voucher | **Corrigido**: data mais recente entre as despesas do voucher |
+| 15 | Leve | Tela antiga "Backup e exportação" existe no código, fora do menu, e fala em "navegador" | Aberto |
+| 16 | Leve | Falta o segundo administrador (conferência de conta bancária exige dois) | Aberto |
+
+## 14. Vigia portuário (Watchmen) pela tabela + cadastro de Feriados (23/11/2026)
+
+Pedido do Julio, a partir da tabela de custo do vigia portuário 2024–2026
+(PDF fora do repositório; os valores **não** ficam no código — são digitados no
+cadastro do porto).
+
+- **Novo modelo de cobrança** do Watchmen no cadastro do porto: **"Tabela do
+  vigia"**. Valores por período de 6 h: dia útil (diurno/noturno), domingo
+  (diurno/noturno) e feriado (diurno/noturno); períodos diurnos e noturnos por
+  dia (a tabela usa 2 + 2); **acréscimo %** (o Julio definiu 20%).
+- **Cálculo** (`src/plataforma/vigia.js`, chamado pelo `calculate` só quando o
+  modelo é "tabela"; os outros modelos não mudaram): a partir da **ETA** da
+  cotação, cada dia da estadia é dia útil, domingo ou feriado (feriado prevalece
+  sobre domingo; sábado conta como dia útil, como na tabela). Estadia
+  fracionada: o último dia entra proporcional. Total × (1 + acréscimo).
+  **O acréscimo não aparece no PDA** (pedido do Julio): a observação da linha
+  mostra só "N dia(s) útil(eis) + N domingo(s) + N feriado(s)".
+- **ETA**: o campo continua texto livre; o cálculo lê `dd/mm/aaaa` (ou
+  `aaaa-mm-dd`). Sem data válida, todos os dias contam como dia útil e aparece
+  alerta na cotação.
+- **Cadastro de Feriados** (Cadastros › Portos › Feriados): data, nome,
+  abrangência nacional ou municipal (com porto). Botão "Adicionar nacionais de
+  AAAA" inclui os 9 nacionais de data fixa; Carnaval, Sexta-feira Santa, Corpus
+  Christi e municipais são cadastrados à mão. Banco: `database/10_feriados.sql`
+  (tabela `holiday`, leitura para quem tem login ativo, gravação só com a
+  permissão `cadastros`; sem exclusão física). Se o 10 não estiver aplicado, o
+  sistema abre sem feriados (aviso no console).
+- Testes: `testes/vigia.test.mjs` (6, valores fictícios).
+- `10_feriados.sql` aplicado na homologação em 23/11 (conferência: 0 feriados, regras ligadas; na primeira tentativa não tinha sido rodado).
+- **Cadastrado na homologação em 23/11 (Claude, no painel do navegador, com o login e o OK do Julio):** 18 feriados nacionais de data fixa (2026 e 2027); no porto, Watchmen no modelo "Tabela do vigia" com os valores do PDF, 2 + 2 períodos, acréscimo de 20%, vigência e fonte (o "a confirmar" saiu). Conferido no banco. Cotação simulada **sem salvar** (ETA num sábado, 3 dias de estadia = 2 úteis + 1 domingo): o Watchmen bateu centavo por centavo com a conta feita à mão pela planilha (+20%), sem alerta.
+- **Pendente com o Julio:** feriados móveis (Carnaval, Sexta-feira Santa, Corpus Christi) e municipais do porto, se valerem para o vigia.
+- (Histórico) **A fazer pelo Julio:** no porto, trocar a forma de cobrança do
+  Watchmen para "Tabela do vigia" e digitar os valores da tabela, a vigência e
+  a fonte (tirando o "a confirmar"); cadastrar os feriados.
