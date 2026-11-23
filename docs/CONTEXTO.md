@@ -191,7 +191,7 @@ imita essas duas interfaces e traduz para tabelas:
 
 ## 8. Testes
 
-**Automáticos (`npm test`, 25 testes, banco falso em memória):** adiantamento
+**Automáticos (`npm test`, 25 testes da gravação + 6 do vigia, banco falso em memória):** adiantamento
 (editar sem duplicar, incluir, excluir); despesa de voucher validado alterada
 por operacional; validação recusada sem permissão; voucher manual por perfil;
 despesas do PDA num envio, na ordem, editáveis; renumerar sem regravar
@@ -465,3 +465,35 @@ Claude percorreu todas as telas no site de homologação, logado como admin,
 | 14 | Leve | Extrato da Conciliação sem data nas linhas de voucher | **Corrigido**: data mais recente entre as despesas do voucher |
 | 15 | Leve | Tela antiga "Backup e exportação" existe no código, fora do menu, e fala em "navegador" | Aberto |
 | 16 | Leve | Falta o segundo administrador (conferência de conta bancária exige dois) | Aberto |
+
+## 14. Vigia portuário (Watchmen) pela tabela + cadastro de Feriados (23/11/2026)
+
+Pedido do Julio, a partir da tabela de custo do vigia portuário 2024–2026
+(PDF fora do repositório; os valores **não** ficam no código — são digitados no
+cadastro do porto).
+
+- **Novo modelo de cobrança** do Watchmen no cadastro do porto: **"Tabela do
+  vigia"**. Valores por período de 6 h: dia útil (diurno/noturno), domingo
+  (diurno/noturno) e feriado (diurno/noturno); períodos diurnos e noturnos por
+  dia (a tabela usa 2 + 2); **acréscimo %** (o Julio definiu 20%).
+- **Cálculo** (`src/plataforma/vigia.js`, chamado pelo `calculate` só quando o
+  modelo é "tabela"; os outros modelos não mudaram): a partir da **ETA** da
+  cotação, cada dia da estadia é dia útil, domingo ou feriado (feriado prevalece
+  sobre domingo; sábado conta como dia útil, como na tabela). Estadia
+  fracionada: o último dia entra proporcional. Total × (1 + acréscimo).
+  **O acréscimo não aparece no PDA** (pedido do Julio): a observação da linha
+  mostra só "N dia(s) útil(eis) + N domingo(s) + N feriado(s)".
+- **ETA**: o campo continua texto livre; o cálculo lê `dd/mm/aaaa` (ou
+  `aaaa-mm-dd`). Sem data válida, todos os dias contam como dia útil e aparece
+  alerta na cotação.
+- **Cadastro de Feriados** (Cadastros › Portos › Feriados): data, nome,
+  abrangência nacional ou municipal (com porto). Botão "Adicionar nacionais de
+  AAAA" inclui os 9 nacionais de data fixa; Carnaval, Sexta-feira Santa, Corpus
+  Christi e municipais são cadastrados à mão. Banco: `database/10_feriados.sql`
+  (tabela `holiday`, leitura para quem tem login ativo, gravação só com a
+  permissão `cadastros`; sem exclusão física). Se o 10 não estiver aplicado, o
+  sistema abre sem feriados (aviso no console).
+- Testes: `testes/vigia.test.mjs` (6, valores fictícios).
+- **A fazer pelo Julio:** rodar o 10; no porto, trocar a forma de cobrança do
+  Watchmen para "Tabela do vigia" e digitar os valores da tabela, a vigência e
+  a fonte (tirando o "a confirmar"); cadastrar os feriados.

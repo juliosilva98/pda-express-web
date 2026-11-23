@@ -11,8 +11,8 @@ const salvo = {};                 // chave -> Map(id -> JSON gravado)
 const primeira = {};              // a primeira gravação de cada lista é a da abertura: vira referência
 const timers = {}, filas = {};
 const tentativas = {};
-export const mapa = { company: {}, bank: {}, port: {}, terminal: {}, supplier: {}, shipowner: {}, vessel: {} };
-export const rev = { company: {}, bank: {}, port: {}, terminal: {}, supplier: {}, shipowner: {}, vessel: {} };
+export const mapa = { company: {}, bank: {}, port: {}, terminal: {}, supplier: {}, shipowner: {}, vessel: {}, holiday: {} };
+export const rev = { company: {}, bank: {}, port: {}, terminal: {}, supplier: {}, shipowner: {}, vessel: {}, holiday: {} };
 export const caminhos = {};       // comprovante: id -> caminho no Storage
 export const contas = { codeToRef: {}, refToCode: {}, grupoCodigo: {}, lista: [] };
 let empresaPadrao = null;
@@ -105,6 +105,14 @@ export async function carregarCadastros() {
     ...(v.beam != null ? { beam: num(v.beam) } : {}),
   }));
   cache.quotations = quots.data.map((q) => ({ ...q.data, id: q.legacy_id || q.id, ...(q.fda_id ? { fdaId: q.fda_id } : {}) }));
+  // feriados (arquivo 10): se a tabela ainda não existir, o sistema abre sem eles
+  const fer = await sel('holiday').order('holiday_date');
+  if (fer.error) { cache.holidays = []; console.warn('Feriados indisponíveis: ' + traduzirErro(fer.error)); }
+  else {
+    fer.data.forEach((h) => ligar('holiday', h.legacy_id || h.id, h.id));
+    cache.holidays = fer.data.filter((h) => h.active).map((h) => ({ id: h.legacy_id || h.id, date: h.holiday_date,
+      name: h.name, scope: h.scope === 'municipal' ? 'municipal' : 'nacional', portId: rev.port[h.port_id] || '' }));
+  }
   cache.companies.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
   return contas.lista;
 }
@@ -270,6 +278,18 @@ const GRAVAR = {
       }, `Navio ${v.name}`));
     },
     remover: desativar('vessel', 'vessel'),
+  },
+  holidays: {
+    async salvar(h) {
+      if (!h.date || !h.name) throw new Error('Feriado: informe a data e o nome');
+      const municipal = h.scope === 'municipal';
+      if (municipal && !mapa.port[h.portId]) throw new Error(`Feriado ${h.name}: escolha o porto do feriado municipal`);
+      ligar('holiday', h.id, await upsert('holiday', {
+        legacy_id: h.id, holiday_date: String(h.date).slice(0, 10), name: h.name, scope: municipal ? 'municipal' : 'nacional',
+        port_id: municipal ? mapa.port[h.portId] : null, active: true,
+      }, `Feriado ${h.name}`));
+    },
+    remover: desativar('holiday', 'holiday'),
   },
   quotations: {
     async salvar(q) {

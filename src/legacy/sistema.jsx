@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { store, abrirComprovante, baixarComprovante } from '../plataforma/cadastros.js';
 import { supabase } from '../supabase.js';
+import { calcularVigia, lerData } from '../plataforma/vigia.js';
 
 const {useState,useEffect,useRef,useCallback}=React;
 
@@ -123,6 +124,8 @@ const companyOf=(list,id)=>{
 const ownerBankFor=(so,co)=>(so&&co&&(so.companyId||co.id)===co.id)?so.bankAccountId:'';
 /* referência para os geradores de PDF resolverem o logo sem receber a lista */
 let COMPANIES_REF=SEED_COMPANIES;
+/* feriados do cadastro (nacionais e municipais), para o cálculo do vigia; atualizado pelo App */
+let FERIADOS_REF=[];
 const logoOf=companyId=>{
   const co=companyOf(COMPANIES_REF,companyId);
   if(co.logo)return co.logo;                       /* data URL enviado no cadastro */
@@ -235,6 +238,9 @@ function tariffWarnings({port,shipowner,vessel,supState,suppliers,refDate,termin
     if(String(o.source||'').toUpperCase().indexOf('A CONFIRMAR')===0)
       w.push({kind:'warn',text:`A tarifa de ${lbl} está marcada como "a confirmar" no cadastro.`});
   });
+  const wmT=port.watchmen||{};
+  if(wmT.enabled&&wmT.model==='tabela'&&!lerData(vessel.eta))
+    w.push({kind:'warn',text:'Watchmen: informe a ETA como dd/mm/aaaa para contar domingos e feriados — sem ela, todos os dias contam como dia útil.'});
   (suppliers||port.suppliers||[]).forEach(sp=>{
     const stt=(supState||{})[sp.id];
     if(!stt||!stt.enabled)return;
@@ -393,7 +399,14 @@ function calculate({port,terminals,shipowner,vessel,supState,suppliers,extras,ci
   if(wm.enabled){
     const d=Number(portStay)||0, model=wm.model||'base_extra';
     let n=0,nota='';
-    if(model==='per_shift'){
+    if(model==='tabela'){
+      /* tabela do vigia: dia útil × domingo × feriado, diurno/noturno; o acréscimo entra no valor e não aparece no PDA */
+      const r=calcularVigia(wm,{eta:vessel.eta,dias:d,portId:port.id},FERIADOS_REF);
+      n=r.valor;
+      const q=x=>Number.isInteger(x)?String(x):x.toFixed(2).replace('.',',');
+      nota=[r.qtd.util?`${q(r.qtd.util)} dia(s) útil(eis)`:'',r.qtd.dom?`${q(r.qtd.dom)} domingo(s)`:'',r.qtd.fer?`${q(r.qtd.fer)} feriado(s)`:'']
+        .filter(Boolean).join(' + ')||'0 dia';
+    }else if(model==='per_shift'){
       const r=Number(wm.shift_rate||0), t=Number(wm.shifts_per_day||0);
       n=r*t*d; nota=`${fBRLplain(r)} × ${t} turno(s)/dia × ${d} dia(s)`;
     }else if(model==='per_day'){
@@ -1314,7 +1327,8 @@ return(
 {fb.enabled&&<tr><td style={{fontWeight:600}}>Fire Brigade</td>
 <td className="num" style={{fontSize:'.82rem'}}>{fb.currency} {fBRLplain(fb.value)}</td><td>—</td><td>—</td></tr>}
 {wm.enabled&&<tr><td style={{fontWeight:600}}>Watchmen</td>
-<td style={{fontSize:'.82rem'}}>{wm.model==='per_shift'?`R$ ${fBRLplain(wm.shift_rate)} × ${wm.shifts_per_day} turnos/dia`
+<td style={{fontSize:'.82rem'}}>{wm.model==='tabela'?`Tabela do vigia: dia útil, domingo e feriado (${Number(wm.diurnos_dia||0)} diurno(s) + ${Number(wm.noturnos_dia||0)} noturno(s)/dia)`
+  :wm.model==='per_shift'?`R$ ${fBRLplain(wm.shift_rate)} × ${wm.shifts_per_day} turnos/dia`
   :wm.model==='per_day'?`R$ ${fBRLplain(wm.rate_per_day)} por dia`:'Base + dia adicional'}</td>
 <td><VigChip o={wm}/></td><td style={{fontSize:'.78rem',color:String(wm.source||'').toUpperCase().startsWith('A CONFIRMAR')?'var(--warn)':'var(--fg-muted)'}}>{wm.source||'—'}</td></tr>}
 <tr><td style={{fontWeight:600}}>Light Dues (TUF)</td><td style={{fontSize:'.82rem'}}>Tabela federal por DWT</td><td>—</td><td>—</td></tr>
@@ -1515,10 +1529,30 @@ tarifa fixa + (DWT × alíquota do tipo de carga)</p>
 {f.watchmen.enabled&&<>
 <div className="field"><label>Forma de cobrança</label>
 <select value={f.watchmen.model||'base_extra'} onChange={e=>sub('watchmen','model',e.target.value)}>
+<option value="tabela">Tabela do vigia — dia útil, domingo e feriado; diurno e noturno</option>
 <option value="per_shift">Por turno — tarifa × turnos/dia × dias de estadia</option>
 <option value="per_day">Por diária — tarifa × dias de estadia</option>
 <option value="base_extra">Base + dia adicional (modelo antigo)</option>
 </select></div>
+{f.watchmen.model==='tabela'&&(()=>{
+  const w=f.watchmen, n=k=>Number(w[k]||0), set=k=>e=>sub('watchmen',k,Number(e.target.value)||0);
+  const campo=(k,l,step)=><div className="field" style={{marginBottom:0}}><label>{l}</label>
+    <input type="number" step={step||'0.01'} value={w[k]??''} onChange={set(k)}/></div>;
+  const dia=(d,nn)=>n('diurnos_dia')*n(d)+n('noturnos_dia')*n(nn);
+  return(<>
+  <div className="note note-info" style={{marginTop:10}}>Valor de cada <strong>período</strong> (6 h) conforme a tabela do vigia.
+  Cada dia da estadia, a partir da ETA da cotação, usa o valor de dia útil, domingo ou feriado
+  (cadastro <strong>Feriados</strong>; o feriado prevalece sobre o domingo). O acréscimo entra no valor e não aparece no PDA.</div>
+  <div className="grid-s">
+  {campo('util_diurno','Dia útil · diurno')}{campo('util_noturno','Dia útil · noturno')}
+  {campo('dom_diurno','Domingo · diurno')}{campo('dom_noturno','Domingo · noturno')}
+  {campo('fer_diurno','Feriado · diurno')}{campo('fer_noturno','Feriado · noturno')}
+  {campo('diurnos_dia','Períodos diurnos por dia','1')}{campo('noturnos_dia','Períodos noturnos por dia','1')}
+  {campo('acrescimo_pct','Acréscimo (%)')}
+  </div>
+  <p style={{fontSize:'.78rem',color:'var(--fg-muted)',marginTop:10}} className="num">
+  Por dia, sem acréscimo: útil {fBRLplain(dia('util_diurno','util_noturno'))} · domingo {fBRLplain(dia('dom_diurno','dom_noturno'))} · feriado {fBRLplain(dia('fer_diurno','fer_noturno'))}</p>
+  </>);})()}
 <div className="grid-s">
 {(f.watchmen.model||'base_extra')==='per_shift'&&<>
 <div className="field" style={{marginBottom:0}}><label>Valor do turno</label>
@@ -1542,12 +1576,12 @@ tarifa fixa + (DWT × alíquota do tipo de carga)</p>
 <AccountPicker label="Conta do armador" value={f.watchmen.acct||ACCT.watchmen}
   onChange={v=>sub('watchmen','acct',v)}/>
 </div>
-<p style={{fontSize:'.78rem',color:'var(--fg-muted)',marginTop:10}} className="num">
+{f.watchmen.model!=='tabela'&&<p style={{fontSize:'.78rem',color:'var(--fg-muted)',marginTop:10}} className="num">
 {(f.watchmen.model||'base_extra')==='per_shift'
   ?`${fBRLplain(f.watchmen.shift_rate||0)} × ${f.watchmen.shifts_per_day||0} turno(s) × dias de estadia`
   :(f.watchmen.model||'base_extra')==='per_day'
   ?`${fBRLplain(f.watchmen.rate_per_day||0)} × dias de estadia`
-  :'(dia adicional × (port stay − 1) + base) × multiplicador'}</p>
+  :'(dia adicional × (port stay − 1) + base) × multiplicador'}</p>}
 <Vigencia obj={f.watchmen} hint="Ex: tabela do sindicato / fatura de referência"
   onSet={(k,v)=>sub('watchmen',k,v)}/>
 <PdaText label={f.watchmen.pdaLabel} comment={f.watchmen.comment}
@@ -2400,6 +2434,98 @@ A cotação comparou {terms.length} terminais. Escolha onde o navio atracou:</p>
 <button className="btn btn-go btn-sm" disabled={!pick} onClick={()=>onConfirm(pick)}>Gerar prestação</button>
 </div>
 </Dialog>);
+}
+
+/* ============================================================
+   FERIADOS — base do cálculo do vigia (Watchmen, modelo "tabela")
+   ============================================================ */
+/* feriados nacionais de data fixa (leis 662/1949, 6.802/1980 e 14.759/2023); os móveis
+   (Carnaval, Sexta-feira Santa, Corpus Christi) e os municipais são cadastrados à mão */
+const FERIADOS_NACIONAIS_FIXOS=[['01-01','Confraternização Universal'],['04-21','Tiradentes'],['05-01','Dia do Trabalho'],
+  ['09-07','Independência do Brasil'],['10-12','Nossa Senhora Aparecida'],['11-02','Finados'],
+  ['11-15','Proclamação da República'],['11-20','Dia Nacional de Zumbi e da Consciência Negra'],['12-25','Natal']];
+const DIAS_SEMANA=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+const diaSemana=d=>{const x=lerData(d);return x?DIAS_SEMANA[x.getUTCDay()]:'';};
+
+function HolidayDialog({item,ports,onSave,onClose}){
+const [f,setF]=useState(()=>item||{date:'',name:'',scope:'nacional',portId:''});
+const s=(k,v)=>setF(p=>({...p,[k]:v}));
+return(
+<Dialog size="sm" title={item?'Editar feriado':'Novo feriado'} onClose={onClose}>
+<form onSubmit={e=>{e.preventDefault();
+  if(!f.date||!f.name.trim())return toast('Informe a data e o nome','bad');
+  if(f.scope==='municipal'&&!f.portId)return toast('Escolha o porto do feriado municipal','bad');
+  onSave({...f,name:f.name.trim(),portId:f.scope==='municipal'?f.portId:''});}}>
+<div className="grid">
+<div className="field"><label>Data *</label>
+<input type="date" value={f.date||''} onChange={e=>s('date',e.target.value)}/>
+{f.date&&<span className="hint">{diaSemana(f.date)}</span>}</div>
+<div className="field"><label>Nome *</label>
+<input value={f.name} onChange={e=>s('name',e.target.value)} placeholder="Ex: Aniversário da cidade"/></div>
+<div className="field"><label>Abrangência</label>
+<select value={f.scope} onChange={e=>s('scope',e.target.value)}>
+<option value="nacional">Nacional — vale para todos os portos</option>
+<option value="municipal">Municipal — só no porto escolhido</option></select></div>
+{f.scope==='municipal'&&<div className="field"><label>Porto *</label>
+<select value={f.portId||''} onChange={e=>s('portId',e.target.value)}>
+<option value="">Selecione...</option>
+{(ports||[]).map(p=><option key={p.id} value={p.id}>{p.city}{p.state?' / '+p.state:''}</option>)}</select></div>}
+</div>
+<div className="form-actions">
+<button type="button" className="btn btn-line btn-sm" onClick={onClose}>Cancelar</button>
+<button type="submit" className="btn btn-primary btn-sm">Salvar</button></div>
+</form></Dialog>);
+}
+
+function HolidaysModule({holidays,setHolidays,ports}){
+const anoAtual=new Date().getFullYear();
+const anos=[...new Set([anoAtual,anoAtual+1,...(holidays||[]).map(h=>Number(String(h.date).slice(0,4)))])].filter(Boolean).sort();
+const [ano,setAno]=useState(anoAtual);
+const [e,setE]=useState(null),[s,setS]=useState(false);
+const lista=(holidays||[]).filter(h=>String(h.date).startsWith(String(ano))).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+const portoDe=id=>{const p=(ports||[]).find(x=>x.id===id);return p?p.city+(p.state?' / '+p.state:''):'porto removido';};
+const save=d=>{ setHolidays(e?holidays.map(x=>x.id===e.id?{...d,id:e.id}:x):[...holidays,{...d,id:uid()}]);
+  setS(false);setE(null);toast(e?'Feriado atualizado':'Feriado cadastrado','ok'); };
+const del=async x=>{
+  const ok=await ask({title:'Excluir feriado',danger:true,confirmLabel:'Excluir',message:`${x.name} (${fDateBR(x.date)}) deixa de contar no cálculo do vigia. Cotações já salvas não mudam.`});
+  if(!ok)return; setHolidays(holidays.filter(y=>y.id!==x.id)); toast('Feriado excluído');
+};
+const addNacionais=async()=>{
+  const novos=FERIADOS_NACIONAIS_FIXOS.map(([md,nome])=>({date:`${ano}-${md}`,name:nome,scope:'nacional',portId:''}))
+    .filter(n=>!(holidays||[]).some(h=>h.scope==='nacional'&&h.date===n.date));
+  if(!novos.length)return toast(`Os feriados nacionais fixos de ${ano} já estão cadastrados`);
+  const ok=await ask({title:`Feriados nacionais de ${ano}`,confirmLabel:'Adicionar',
+    message:`Serão adicionados ${novos.length} feriado(s) nacional(is) de data fixa. Carnaval, Sexta-feira Santa, Corpus Christi e os municipais você cadastra em "Novo feriado".`});
+  if(!ok)return;
+  setHolidays([...holidays,...novos.map(n=>({...n,id:uid()}))]);
+  toast(`${novos.length} feriado(s) adicionado(s)`,'ok');
+};
+return(
+<div className="card">
+<div className="card-head"><div><h2>Feriados</h2>
+<div className="sub">Base do cálculo do vigia (Watchmen): dia de feriado usa o valor de feriado</div></div>
+<div className="actions">
+<button className="btn btn-line btn-sm" onClick={addNacionais}>Adicionar nacionais de {ano}</button>
+<button className="btn btn-primary btn-sm" onClick={()=>{setE(null);setS(true);}}>Novo feriado</button></div></div>
+<div className="subnav" style={{marginBottom:14}}>
+{anos.map(a=><button key={a} className={ano===a?'active':''} onClick={()=>setAno(a)}>{a} · {(holidays||[]).filter(h=>String(h.date).startsWith(String(a))).length}</button>)}
+</div>
+{lista.length===0
+ ?<Empty title={`Nenhum feriado cadastrado em ${ano}`} text={`Use "Adicionar nacionais de ${ano}" e cadastre os municipais e os móveis em "Novo feriado".`}/>
+ :<div className="tscroll"><table>
+<thead><tr><th>Data</th><th>Dia</th><th>Feriado</th><th>Abrangência</th><th className="ta-c">Ações</th></tr></thead>
+<tbody>{lista.map(x=>(
+<tr key={x.id}>
+<td className="num">{fDateBR(x.date)}</td>
+<td style={{fontSize:'.82rem'}}>{diaSemana(x.date)}</td>
+<td style={{fontWeight:600}}><button type="button" className="nome-link" onClick={()=>{setE(x);setS(true)}}>{x.name}</button></td>
+<td>{x.scope==='municipal'?<span className="chip chip-warn">Municipal · {portoDe(x.portId)}</span>:<span className="chip chip-info">Nacional</span>}</td>
+<td><Acoes>
+<button className="btn btn-line btn-sm" onClick={()=>{setE(x);setS(true)}}>Editar</button>
+<button className="btn btn-bad btn-sm" onClick={()=>del(x)}>Excluir</button>
+</Acoes></td></tr>))}</tbody></table></div>}
+{s&&<HolidayDialog item={e} ports={ports} onSave={save} onClose={()=>{setS(false);setE(null);}}/>}
+</div>);
 }
 
 /* ============================================================
@@ -5068,7 +5194,7 @@ Código de integridade (SHA-256): {res.hash||'indisponível'}</p>
 const CAD_MENU=[
   {grupo:null,itens:[['overview','Visão geral']]},
   {grupo:'Clientes',itens:[['owners','Armadores'],['vessels','Navios'],['contracts','Contratos com terminais']]},
-  {grupo:'Portos',itens:[['ports','Todos os portos']],portos:true},
+  {grupo:'Portos',itens:[['ports','Todos os portos'],['holidays','Feriados']],portos:true},
   {grupo:'Organização',itens:[['company','Empresas'],['users','Usuários']]}
 ];
 
@@ -5276,6 +5402,7 @@ const [terminals,setTerminals]=useState(()=>migrateTerminals(store.get('terminal
 const [shipowners,setShipowners]=useState(()=>migrateOwners(store.get('shipowners',SEED_SHIPOWNERS)));
 const [companies,setCompanies]=useState(()=>migrateCompanies(store.get('companies',null),store.get('company',null)));
 const [vessels,setVessels]=useState(()=>store.get('vessels',SEED_VESSELS));
+const [holidays,setHolidays]=useState(()=>store.get('holidays',[]));
 /* Fornecedores saíram de dentro do porto e viraram cadastro próprio.
    Bases antigas são migradas uma vez, preservando os ids. */
 const [suppliers,setSuppliers]=useState(()=>{
@@ -5297,6 +5424,8 @@ useEffect(()=>store.set('ports',ports),[ports]);
 useEffect(()=>store.set('terminals',terminals),[terminals]);
 useEffect(()=>store.set('shipowners',shipowners),[shipowners]);
 useEffect(()=>store.set('vessels',vessels),[vessels]);
+useEffect(()=>{ store.set('holidays',holidays); FERIADOS_REF=holidays; },[holidays]);
+FERIADOS_REF=holidays;
 useEffect(()=>store.set('suppliers',suppliers),[suppliers]);
 useEffect(()=>{ store.set('companies',companies); COMPANIES_REF=companies; },[companies]);
 COMPANIES_REF=companies;
@@ -5361,7 +5490,7 @@ const OP_TABS=[...(R.can('cotar')?[['quote',editQuote?'Editando cotação':'Nova
   ['history','PDAs',quotations.length],['fda','FDAs',null],['sda','SDAs',null]];
 useEffect(()=>{ if(!R.can('cotar')&&tab==='quote')setTab('history'); if(!R.can('cadastros')&&area==='cad')setArea('op'); },[R.role]);
 const counts={company:companies.length,owners:shipowners.length,vessels:vessels.length,ports:ports.length,
-  terminals:terminals.length,suppliers:suppliers.length,
+  terminals:terminals.length,suppliers:suppliers.length,holidays:holidays.length,
   contracts:shipowners.reduce((a,s2)=>a+(s2.terminalContracts||[]).length,0)};
 const pend=pendencias({companies,shipowners,vessels,ports,terminals,suppliers});
 const pendGraves=pend.filter(p=>p.sev==='bad').length;
@@ -5458,6 +5587,7 @@ return(
 {cadTab==='users'&&<UsersModule/>}
 {cadTab==='owners'&&<OwnersModule shipowners={shipowners} setShipowners={setShipowners} vessels={vessels} terminals={terminals} ports={ports} companies={companies}/>}
 {cadTab==='vessels'&&<VesselsModule vessels={vessels} setVessels={setVessels} shipowners={shipowners}/>}
+{cadTab==='holidays'&&<HolidaysModule holidays={holidays} setHolidays={setHolidays} ports={ports}/>}
 {cadTab==='contracts'&&<ContractsModule shipowners={shipowners} terminals={terminals} ports={ports}/>}
 {cadTab==='ports'&&<PortsModule ports={ports} setPorts={setPorts} terminals={terminals} setTerminals={setTerminals}
   suppliers={suppliers} setSuppliers={setSuppliers} sel={portSel} setSel={setPortSel}/>}
